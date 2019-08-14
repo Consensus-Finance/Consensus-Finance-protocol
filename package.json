@@ -2,6 +2,13 @@
   "name": "town-smart-contract",
   "version": "1.0.0",
   "description": "Town smart contract",
+  "scripts": {
+    "lint": "npm run eslint && npm run solium",
+    "eslint": "eslint test/ migrations/",
+    "solium": "solium --dir contracts",
+    "test": "truffle test",
+    "truffle": "truffle"
+  },
   "dependencies": {
     "@openzeppelin/contracts": "^2.3.0"
   },
@@ -24,13 +31,6 @@
     "karma": "^4.2.0",
     "lodash": "^4.17.15",
     "web3-utils": "^1.2.1"
-  },
-  "scripts": {
-    "lint": "npm run eslint && npm run solium",
-    "eslint": "eslint test/ migrations/",
-    "solium": "solium --dir contracts",
-    "test": "truffle test",
-    "truffle": "truffle"
   },
   "repository": {
     "type": "git",

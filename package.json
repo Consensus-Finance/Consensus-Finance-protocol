@@ -2,7 +2,9 @@
   "name": "town-smart-contract",
   "version": "1.0.0",
   "description": "Town smart contract",
-  "dependencies": {},
+  "dependencies": {
+    "@openzeppelin/contracts": "^2.3.0"
+  },
   "devDependencies": {
     "babel-polyfill": "^6.26.0",
     "babel-preset-env": "^1.7.0",

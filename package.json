@@ -1,15 +1,39 @@
 {
   "name": "town-smart-contract",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Town smart contract",
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "babel-register": "^6.26.0",
+    "bignumber.js": "^9.0.0",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "chai-bignumber": "^3.0.0",
+    "eslint": "^6.1.0",
+    "eslint-config-airbnb": "^18.0.1",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-react": "^7.14.3",
+    "eslint-plugin-react-hooks": "^1.7.0",
+    "ethereumjs-testrpc-sc": "^6.5.1-sc.0",
+    "karma": "^4.2.0",
+    "lodash": "^4.17.15",
+    "web3-utils": "^1.2.1"
+  },
   "scripts": {
-    "test": "truffle test"
+    "lint": "npm run eslint && npm run solium",
+    "eslint": "eslint test/ migrations/",
+    "solium": "solium --dir contracts",
+    "test": "truffle test",
+    "truffle": "truffle"
   },
   "repository": {
     "type": "git",
     "url": "git@git.sfxdx.ru:town/town-smart-contract.git"
   },
-  "author": "Integral Team"
+  "author": "Integral Team",
+  "license": "MIT"
 }

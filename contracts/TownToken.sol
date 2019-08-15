@@ -4,6 +4,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Mintable.sol";
 
 
 contract TownToken is ERC20Mintable {
+    using SafeMath for uint256;
+
     string public constant name = "Town Token";
     string public constant symbol = "TTW";
     uint8 public constant decimals = 18;
@@ -22,5 +24,9 @@ contract TownToken is ERC20Mintable {
             holders.push(recipient);
         }
         return ERC20Mintable(address(this)).transfer(recipient, amount);
+    }
+
+    function getHolders() public view returns (address[]) {
+        return holders;
     }
 }

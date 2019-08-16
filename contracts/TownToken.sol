@@ -12,6 +12,14 @@ contract TownToken is ERC20Mintable {
 
     address[] private holders;
 
+    function getHoldersCount() external view returns (uint256) {
+        return holders.length;
+    }
+
+    function getHolderByIndex(uint256 index) external view returns (address) {
+        return holders[index];
+    }
+
     function transfer(address recipient, uint256 amount) public returns (bool) {
         bool found = false;
         for (uint i = 0; i < holders.length; ++i) {
@@ -24,9 +32,5 @@ contract TownToken is ERC20Mintable {
             holders.push(recipient);
         }
         return ERC20Mintable(address(this)).transfer(recipient, amount);
-    }
-
-    function getHolders() public view returns (address[]) {
-        return holders;
     }
 }

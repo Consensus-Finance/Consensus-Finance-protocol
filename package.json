@@ -6,6 +6,7 @@
     "lint": "npm run eslint && npm run solium",
     "eslint": "eslint test/ migrations/",
     "solium": "solium --dir contracts",
+    "build": "truffle build",
     "test": "truffle test",
     "truffle": "truffle"
   },

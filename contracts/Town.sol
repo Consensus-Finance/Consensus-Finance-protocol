@@ -66,6 +66,32 @@ contract Town is Ownable {
 
     //////////////////////////////////////////////////////////
 
+    function token() external view returns (IERC20) {
+        return _token;
+    }
+
+    function currentRate() external view returns (uint256) {
+        return _startRate;
+    }
+
+    function getCountRemunerationForAddress(address user) external view returns (uint256) {
+        return _remunerationsQueue[user].length;
+    }
+
+    function getRemunerationForAddress(address user, uint256 index) external view returns (uint256, uint256) {
+        return (_remunerationsQueue[user][index]._priority, _remunerationsQueue[user][index]._amount);
+    }
+
+    function getCountBuyRequestForAddress(address user) external view returns (uint256) {
+        return _queueBuyRequests[user].length;
+    }
+
+    function getBuyRequestForAddress(address user, uint256 index) external  view returns (uint256, uint256) {
+        return (_queueBuyRequests[user][index]._rate, _queueBuyRequests[user][index]._amount);
+    }
+
+    //////////////////////////////////////////////////////////
+
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
         return true;
     }
@@ -74,7 +100,7 @@ contract Town is Ownable {
         return true;
     }
 
-    function refunds(uint256 amount) public external returns (bool) {
+    function refunds(uint256 amount) public returns (bool) {
         return true;
     }
 
@@ -92,24 +118,5 @@ contract Town is Ownable {
 
     function claimFunds(address official) public returns (bool) {
         return true;
-    }
-
-    //////////////////////////////////////////////////////////
-
-    function token() public returns (IERC20) {
-        return _token;
-    }
-
-    function currentRate() public returns (uint256) {
-        return _startRate;
-    }
-
-    function findRemunerationForAddress(address user) public returns (RemunerationsInfo[]) {
-        return _remunerationsQueue[user];
-
-    }
-
-    function findBuyRequestForAddress(address user) public returns (TransactionsInfo[]) {
-        return _externalTokensAddresses;
     }
 }

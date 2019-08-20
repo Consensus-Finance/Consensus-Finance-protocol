@@ -71,6 +71,41 @@ contract Town {
         require(msg.sender == address(_token));
         _;
     }
+
+    //////////////////////////////////////////////////////////
+
+    constructor (
+        uint256 distributionPeriodType,
+        uint256 distributionPeriodsNumber,
+        uint256 startRate,
+        uint256 totalSupplyTownTokens,
+        uint256 minTokenBuyAmount,
+        uint256 durationOfMinTokenBuyAmount,
+        uint256 maxTokenBuyAmount,
+        uint256 minExternalTokensAmount ) public {
+        require(distributionPeriodType >= 0 && distributionPeriodType < 7, "distributionPeriodType wrong");
+        require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
+        require(startRate > 0, "startRate wrong");
+        require(totalSupplyTownTokens > 0 && totalSupplyTownTokens < 10 ** 15, "totalSupplyTownTokens wrong");
+        require(minTokenBuyAmount > 0, "minTokenBuyAmount wrong");
+        require(durationOfMinTokenBuyAmount > 0, "durationOfMinTokenBuyAmount wrong");
+        require(maxTokenBuyAmount > 0, "maxTokenBuyAmount wrong");
+        require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
+
+        _distributionPeriodType = distributionPeriodType;
+        _distributionPeriodsNumber = distributionPeriodsNumber;
+        _startRate = startRate;
+
+        _token = new TownToken(totalSupplyTownTokens);
+
+        _buyersCount = 0;
+        _minTokenBuyAmount = minTokenBuyAmount;
+        _durationOfMinTokenBuyAmount = durationOfMinTokenBuyAmount;
+        _maxTokenBuyAmount = maxTokenBuyAmount;
+        _minExternalTokensAmount = minExternalTokensAmount;
+        _lastDistributionsDate = now;
+    }
+
     //////////////////////////////////////////////////////////
 
     function token() external view returns (IERC20) {
@@ -229,7 +264,9 @@ contract Town {
         uint256 amount = msg.value;
         uint256 tokenAmount = checkTownTokensRate(amount);
         uint256 rate = _startRate.mul(_buyersCount.add(1));
-        require(tokenAmount > _minTokenBuyAmount, "Cannot get tokens less that _minTokenBuyAmount");
+        if (_buyersCount < _durationOfMinTokenBuyAmount && tokenAmount > _minTokenBuyAmount) {
+            return false;
+        }
         if (tokenAmount >= _maxTokenBuyAmount) {
             tokenAmount = _maxTokenBuyAmount;
             uint256 change = amount.sub(_maxTokenBuyAmount.mul(rate));

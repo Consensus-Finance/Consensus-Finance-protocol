@@ -67,6 +67,12 @@ contract Town {
 
     //////////////////////////////////////////////////////////
 
+    modifier onlyTownTokenSmartContract {
+        require(msg.sender == address(_token));
+        _;
+    }
+    //////////////////////////////////////////////////////////
+
     function token() external view returns (IERC20) {
         return _token;
     }
@@ -92,6 +98,23 @@ contract Town {
         return (tokenRequest._address, tokenRequest._info._rate, tokenRequest._info._amount);
     }
 
+    function getMyTownTokens() external view returns (uint256, uint256) {
+        uint256 amount = 0;
+        uint256 tokenAmount = 0;
+        for (uint256 i = 0; i < _historyTransactions[msg.sender].length; ++i) {
+            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate));
+            tokenAmount = tokenAmount.add(_historyTransactions[msg.sender][i]._amount);
+        }
+        return (amount, tokenAmount);
+    }
+
+    function checkProposal(address proposal) external returns (bool) {
+        if (_externalTokens[proposal]._entities.length > 0) {
+            return true;
+        }
+        return false;
+    }
+
     //////////////////////////////////////////////////////////
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
@@ -111,16 +134,6 @@ contract Town {
         tokenObj._entities.push(tokenInfo);
 
         return true;
-    }
-
-    function getMyTownTokens() external view returns (uint256, uint256) {
-        uint256 amount = 0;
-        uint256 tokenAmount = 0;
-        for (uint256 i = 0; i < _historyTransactions[msg.sender].length; ++i) {
-            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate));
-            tokenAmount = tokenAmount.add(_historyTransactions[msg.sender][i]._amount);
-        }
-        return (amount, tokenAmount);
     }
 
     function refunds(uint256 tokensAmount) external returns (bool) {
@@ -191,15 +204,18 @@ contract Town {
         return true;
     }
 
-    function voteOn(address holder, address externalToken, uint256 amount) public returns (bool) {
+    function voteOn(address externalToken, uint256 amount) external onlyTownTokenSmartContract returns (bool) {
+        require(_externalTokens[externalToken]._entities.length > 0, "external token address not found");
+
+        _externalTokens[externalToken]._weight = _externalTokens[externalToken]._weight.add(amount);
         return true;
     }
 
-    function claimExternalTokens(address holder) public returns (bool) {
+    function claimExternalTokens(address holder) external returns (bool) {
         return true;
     }
 
-    function claimFunds(address official) public returns (bool) {
+    function claimFunds(address official) external returns (bool) {
         return true;
     }
 

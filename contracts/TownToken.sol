@@ -1,9 +1,10 @@
 pragma solidity ^0.5.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20Mintable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 
 
-contract TownToken is ERC20Mintable {
+contract TownToken is ERC20, Ownable {
     using SafeMath for uint256;
 
     string public constant name = "Town Token";
@@ -11,6 +12,10 @@ contract TownToken is ERC20Mintable {
     uint8 public constant decimals = 18;
 
     address[] private holders;
+
+    constructor (uint256 totalSupply) public {
+        _mint(this.owner(), totalSupply * (10 ** uint256(this.decimals())));
+    }
 
     function getHoldersCount() external view returns (uint256) {
         return holders.length;
@@ -31,6 +36,6 @@ contract TownToken is ERC20Mintable {
         if (found == false) {
             holders.push(recipient);
         }
-        return ERC20Mintable(address(this)).transfer(recipient, amount);
+        return ERC20(address(this)).transfer(recipient, amount);
     }
 }

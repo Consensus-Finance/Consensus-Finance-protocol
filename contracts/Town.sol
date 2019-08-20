@@ -1,10 +1,9 @@
 pragma solidity ^0.5.0;
 
-import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "./TownToken.sol";
 
 
-contract Town is Ownable {
+contract Town {
     using SafeMath for uint256;
 
     struct ExternalTokenDistributionsInfo {
@@ -24,20 +23,24 @@ contract Town is Ownable {
         uint256 _amount;
     }
 
+    struct TownTokenRequest {
+        address _address;
+        TransactionsInfo _info;
+    }
+
     struct RemunerationsInfo {
+        address _address;
         uint256 _priority;
         uint256 _amount;
     }
 
     //////////////////////////////////////////////////////////
 
-    uint256 private _gasSourceType;
     uint256 private _distributionPeriodType;
     uint256 private _distributionPeriodsNumber;
     uint256 private _startRate;
 
     TownToken private _token;
-    address payable private _wallet;
 
     uint256 private _buyersCount;
     uint256 private _minTokenBuyAmount;
@@ -49,11 +52,9 @@ contract Town is Ownable {
 
     mapping (address => TransactionsInfo[]) private _historyTransactions;
 
-    mapping (address => TransactionsInfo[]) private _queueBuyRequests;
-    address[] private _queueBuyRequestsAddresses;
+    TownTokenRequest[] private _queueTownTokenRequests;
 
-    mapping (address => RemunerationsInfo[]) private _remunerationsQueue;
-    address[] private _remunerationsQueueAddresses;
+    RemunerationsInfo[] private _remunerationsQueue;
 
     mapping (address => ExternalToken) private _externalTokens;
     address[] private _externalTokensAddresses;
@@ -74,41 +75,123 @@ contract Town is Ownable {
         return _startRate;
     }
 
-    function getCountRemunerationForAddress(address user) external view returns (uint256) {
-        return _remunerationsQueue[user].length;
+    function getLengthRemunerationQueue() external view returns (uint256) {
+        return _remunerationsQueue.length;
     }
 
-    function getRemunerationForAddress(address user, uint256 index) external view returns (uint256, uint256) {
-        return (_remunerationsQueue[user][index]._priority, _remunerationsQueue[user][index]._amount);
+    function getRemunerationQueue(uint256 index) external view returns (address, uint256, uint256) {
+        return (_remunerationsQueue[index]._address, _remunerationsQueue[index]._priority, _remunerationsQueue[index]._amount);
     }
 
-    function getCountBuyRequestForAddress(address user) external view returns (uint256) {
-        return _queueBuyRequests[user].length;
+    function getLengthQueueTownTokenRequests() external view returns (uint256) {
+        return _queueTownTokenRequests.length;
     }
 
-    function getBuyRequestForAddress(address user, uint256 index) external  view returns (uint256, uint256) {
-        return (_queueBuyRequests[user][index]._rate, _queueBuyRequests[user][index]._amount);
+    function getQueueTownTokenRequests(uint256 index) external  view returns (address, uint256, uint256) {
+        TownTokenRequest memory tokenRequest = _queueTownTokenRequests[index];
+        return (tokenRequest._address, tokenRequest._info._rate, tokenRequest._info._amount);
     }
 
     //////////////////////////////////////////////////////////
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
+        ERC20 tokenERC20 = ERC20(externalToken);
+        uint256 balance = tokenERC20.allowance(official, address(this));
+        require(tokenERC20.balanceOf(official) >= balance, "Official should have external tokens for approved");
+        require(balance > 0, "External tokens must be approved for town smart contract");
+        tokenERC20.transferFrom(official, address(this), balance);
+
+        ExternalTokenDistributionsInfo memory tokenInfo;
+        tokenInfo._official = official;
+        tokenInfo._fullBalance = balance;
+        tokenInfo._distributionsCount = _distributionPeriodsNumber;
+        tokenInfo._distributionAmount = balance / _distributionPeriodsNumber;
+
+        ExternalToken storage tokenObj = _externalTokens[externalToken];
+        tokenObj._entities.push(tokenInfo);
+
         return true;
     }
 
-    function buyTownTokens(address holder, uint256 amount) public payable returns (bool) {
+    function getMyTownTokens() external view returns (uint256, uint256) {
+        uint256 amount = 0;
+        uint256 tokenAmount = 0;
+        for (uint256 i = 0; i < _historyTransactions[msg.sender].length; ++i) {
+            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate));
+            tokenAmount = tokenAmount.add(_historyTransactions[msg.sender][i]._amount);
+        }
+        return (amount, tokenAmount);
+    }
+
+    function refunds(uint256 tokensAmount) external returns (bool) {
+        require(_token.balanceOf(msg.sender) >= tokensAmount, "Town tokens not found");
+        require(_token.allowance(msg.sender, address(this)) >= tokensAmount, "Town tokens must be approved for town smart contract");
+
+        uint256 debt = 0;
+        uint256 restOfTokens = tokensAmount;
+        uint256 executedRequestCount = 0;
+        for (uint256 i = 0; i < _queueTownTokenRequests.length; ++i) {
+            address user = _queueTownTokenRequests[i]._address;
+            uint256 rate = _queueTownTokenRequests[i]._info._rate;
+            uint256 amount = _queueTownTokenRequests[i]._info._amount;
+            if (restOfTokens > amount) {
+                _token.transferFrom(msg.sender, user, amount);
+                restOfTokens = restOfTokens.sub(amount);
+                debt = debt.add(amount.mul(rate));
+                executedRequestCount++;
+            } else {
+                break;
+            }
+        }
+
+        if (executedRequestCount > 0) {
+            for (uint256 i = executedRequestCount; i < _queueTownTokenRequests.length; ++i) {
+                _queueTownTokenRequests[i - executedRequestCount] = _queueTownTokenRequests[i];
+            }
+
+            for (uint256 i = 0; i < executedRequestCount; ++i) {
+                delete _queueTownTokenRequests[_queueTownTokenRequests.length - 1];
+                _queueTownTokenRequests.length--;
+            }
+        }
+
+        _token.transferFrom(msg.sender, address(this), restOfTokens);
+
+        for (uint256 i = _historyTransactions[msg.sender].length - 1; i >= 0; --i) {
+            uint256 rate = _historyTransactions[msg.sender][i]._rate;
+            uint256 amount = _historyTransactions[msg.sender][i]._amount;
+            delete _historyTransactions[msg.sender][i];
+            _historyTransactions[msg.sender].length--;
+
+            if (restOfTokens < amount) {
+                TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
+                _historyTransactions[msg.sender].push(info);
+
+                debt = debt.add(rate.mul(restOfTokens));
+                restOfTokens = 0;
+                break;
+            }
+            debt = debt.add(rate.mul(amount));
+            restOfTokens = restOfTokens.sub(amount);
+        }
+
+        if (debt > address(this).balance) {
+            msg.sender.transfer(address(this).balance);
+
+            RemunerationsInfo memory info = RemunerationsInfo(msg.sender, 2, debt.sub(address(this).balance));
+            _remunerationsQueue.push(info);
+        } else {
+            msg.sender.transfer(debt);
+        }
+
         return true;
     }
 
-    function refunds(uint256 amount) public returns (bool) {
+    function distributionSnapshot() external returns (bool) {
         return true;
     }
 
-    function voteOn(address externalToken, uint256 amount) public returns (bool) {
-        return true;
-    }
-
-    function distributionSnapshot() public returns (bool) {
+    function voteOn(address holder, address externalToken, uint256 amount) public returns (bool) {
         return true;
     }
 
@@ -117,6 +200,42 @@ contract Town is Ownable {
     }
 
     function claimFunds(address official) public returns (bool) {
+        return true;
+    }
+
+    function checkTownTokensRate(uint256 amount) public view returns (uint256) {
+        return amount.div(_startRate.mul(_buyersCount.add(1)));
+    }
+
+    function getTownTokens(address holder) public payable returns (bool) {
+        require(holder != address(0), "holder address cannot be null");
+
+        uint256 amount = msg.value;
+        uint256 tokenAmount = checkTownTokensRate(amount);
+        uint256 rate = _startRate.mul(_buyersCount.add(1));
+        require(tokenAmount > _minTokenBuyAmount, "Cannot get tokens less that _minTokenBuyAmount");
+        if (tokenAmount >= _maxTokenBuyAmount) {
+            tokenAmount = _maxTokenBuyAmount;
+            uint256 change = amount.sub(_maxTokenBuyAmount.mul(rate));
+            msg.sender.transfer(change);
+            amount = amount.sub(change);
+        }
+
+        TransactionsInfo memory transactionsInfo = TransactionsInfo(rate, tokenAmount);
+        if (_token.balanceOf(address(this)) >= tokenAmount) {
+            _token.transfer(holder, tokenAmount);
+            _historyTransactions[holder].push(transactionsInfo);
+            _buyersCount = _buyersCount.add(1);
+        } else {
+            if (_token.balanceOf(address(this)) > 0) {
+                uint256 tokenBalance = _token.balanceOf(address(this));
+                _token.transfer(holder, tokenBalance);
+                tokenAmount = tokenAmount.sub(tokenBalance);
+            }
+
+            TownTokenRequest memory tokenRequest = TownTokenRequest(holder, transactionsInfo);
+            _queueTownTokenRequests.push(tokenRequest);
+        }
         return true;
     }
 }

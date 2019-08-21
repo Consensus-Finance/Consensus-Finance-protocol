@@ -8,7 +8,6 @@ contract Town {
 
     struct ExternalTokenDistributionsInfo {
         address _official;
-        uint256 _fullBalance;
         uint256 _distributionAmount;
         uint256 _distributionsCount;
     }
@@ -36,7 +35,7 @@ contract Town {
 
     //////////////////////////////////////////////////////////
 
-    uint256 private _distributionPeriodType;
+    uint256 private _distributionPeriod;
     uint256 private _distributionPeriodsNumber;
     uint256 private _startRate;
 
@@ -75,15 +74,16 @@ contract Town {
     //////////////////////////////////////////////////////////
 
     constructor (
-        uint256 distributionPeriodType,
+        uint256 distributionPeriod,
         uint256 distributionPeriodsNumber,
         uint256 startRate,
         uint256 totalSupplyTownTokens,
         uint256 minTokenBuyAmount,
         uint256 durationOfMinTokenBuyAmount,
         uint256 maxTokenBuyAmount,
-        uint256 minExternalTokensAmount ) public {
-        require(distributionPeriodType >= 0 && distributionPeriodType < 7, "distributionPeriodType wrong");
+        uint256 minExternalTokensAmount,
+        uint256 startTime) public {
+        require(distributionPeriod > 0, "distributionPeriod wrong");
         require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
         require(startRate > 0, "startRate wrong");
         require(totalSupplyTownTokens > 0 && totalSupplyTownTokens < 10 ** 15, "totalSupplyTownTokens wrong");
@@ -91,8 +91,9 @@ contract Town {
         require(durationOfMinTokenBuyAmount > 0, "durationOfMinTokenBuyAmount wrong");
         require(maxTokenBuyAmount > 0, "maxTokenBuyAmount wrong");
         require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
+        require(startTime > 0, "startTime wrong");
 
-        _distributionPeriodType = distributionPeriodType;
+        _distributionPeriod = distributionPeriod * 1 days;
         _distributionPeriodsNumber = distributionPeriodsNumber;
         _startRate = startRate;
 
@@ -103,7 +104,7 @@ contract Town {
         _durationOfMinTokenBuyAmount = durationOfMinTokenBuyAmount;
         _maxTokenBuyAmount = maxTokenBuyAmount;
         _minExternalTokensAmount = minExternalTokensAmount;
-        _lastDistributionsDate = now;
+        _lastDistributionsDate = startTime;
     }
 
     //////////////////////////////////////////////////////////
@@ -161,11 +162,15 @@ contract Town {
 
         ExternalTokenDistributionsInfo memory tokenInfo;
         tokenInfo._official = official;
-        tokenInfo._fullBalance = balance;
         tokenInfo._distributionsCount = _distributionPeriodsNumber;
-        tokenInfo._distributionAmount = balance / _distributionPeriodsNumber;
+        tokenInfo._distributionAmount = balance.div(_distributionPeriodsNumber);
 
         ExternalToken storage tokenObj = _externalTokens[externalToken];
+
+        if (tokenObj._entities.length == 0) {
+            _externalTokensAddresses.push(externalToken);
+        }
+
         tokenObj._entities.push(tokenInfo);
 
         return true;
@@ -236,21 +241,118 @@ contract Town {
     }
 
     function distributionSnapshot() external returns (bool) {
+        require(now > (_lastDistributionsDate + _distributionPeriod), "distribution time has not yet arrived");
+
+        uint256 sumWeight = 0;
+        address[] memory externalTokensWithWight;
+        for (uint256 i = 0; i < _externalTokensAddresses.length; ++i) {
+            ExternalToken memory externalToken = _externalTokens[_externalTokensAddresses[i]];
+            if (externalToken._weight > 0) {
+                uint256 sumExternalTokens = 0;
+                for (uint256 j = 0; j < externalToken._entities.length; ++j) {
+                    if (externalToken._entities[j]._distributionsCount == _distributionPeriodsNumber) {
+                        ExternalTokenDistributionsInfo memory info = externalToken._entities[j];
+                        sumExternalTokens = sumExternalTokens.add(info._distributionAmount.mul(info._distributionsCount));
+                    }
+                }
+                if (sumExternalTokens > _minExternalTokensAmount) {
+                    sumWeight = sumWeight.add(externalToken._weight);
+                    externalTokensWithWight.push[_externalTokensAddresses[i]];
+                } else {
+                    externalToken._weight = 0;
+                }
+            }
+        }
+
+        for (uint256 i = _officialsLedgerAddresses.length - 1; i >= 0 ; --i) {
+            delete _officialsLedger[_officialsLedgerAddresses[i]];
+            delete _officialsLedgerAddresses[i];
+            _officialsLedgerAddresses.length --;
+        }
+
+        uint256 fullBalance = address(this).balance;
+        for (uint256 i = 0; i < externalTokensWithWight.length; ++i) {
+            ExternalToken memory externalToken = _externalTokens[externalTokensWithWight[i]];
+            uint256 sumExternalTokens = 0;
+            for (uint256 j = 0; j < externalToken._entities.length; ++j) {
+                sumExternalTokens = sumExternalTokens.add(externalToken._entities[j]._distributionAmount);
+            }
+            uint256 externalTokenCost = fullBalance.mul(externalToken._weight).div(sumWeight);
+            for (uint256 j = 0; j < externalToken._entities.length; ++j) {
+                address official = externalToken._entities[j]._official;
+                if (_officialsLedger[official] == 0) {
+                    _officialsLedgerAddresses.push(official);
+                }
+                uint256 amount = externalToken._entities[j]._distributionAmount;
+                _officialsLedger[official] = _officialsLedger[official].add(externalTokenCost.mul(amount).div(sumExternalTokens));
+            }
+        }
+
+        uint256 sumHoldersTokens = _token.totalSupply().sub(_token.balanceOf(address(this)));
+
+        if (sumHoldersTokens != 0) {
+            for (uint256 i = 0; i < _token.getHoldersCount(); ++i) {
+                address holder = _token.getHolderByIndex(i);
+                uint256 balance = _token.balanceOf(holder);
+                for (uint256 j = 0; j < _externalTokensAddresses.length; ++j) {
+                    address externalTokenAddress = _externalTokensAddresses[j];
+                    ExternalToken memory externalToken = _externalTokens[externalTokenAddress];
+                    for (uint256 k = 0; k < externalToken._entities.length; ++k) {
+                        if (holder != address(this) && externalToken._entities[k]._distributionsCount > 0) {
+                            uint256 percent = balance.mul(externalToken._entities[k]._distributionAmount).div(sumHoldersTokens);
+                            if (percent > (10 ** 4)) {
+                                address[] memory externalTokensForHolder = _ledgerExternalTokensAddresses[holder];
+                                bool found = false;
+                                for (uint256 h = 0; h < externalTokensForHolder.length; ++h) {
+                                    if (externalTokensForHolder[h] == externalTokenAddress) {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if (found == false) {
+                                    _ledgerExternalTokensAddresses[holder].push(externalTokenAddress);
+                                }
+
+                                _townHoldersLedger[holder][externalTokenAddress] = _townHoldersLedger[holder][externalTokenAddress].add(percent);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return true;
     }
 
     function voteOn(address externalToken, uint256 amount) external onlyTownTokenSmartContract returns (bool) {
         require(_externalTokens[externalToken]._entities.length > 0, "external token address not found");
+        require(now > (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
 
         _externalTokens[externalToken]._weight = _externalTokens[externalToken]._weight.add(amount);
         return true;
     }
 
     function claimExternalTokens(address holder) external returns (bool) {
+        address[] memory externalTokensForHolder = _ledgerExternalTokensAddresses[holder];
+        for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
+            ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
+            delete _townHoldersLedger[holder][externalTokensForHolder[i]];
+            externalTokensForHolder.length--;
+        }
+        delete _ledgerExternalTokensAddresses[holder];
         return true;
     }
 
     function claimFunds(address official) external returns (bool) {
+        require(_officialsLedger[official] == 0, "official address not fount in ledger");
+
+        uint256 amount = _officialsLedger[official];
+        if (address(this).balance >= amount) {
+            address(this).transfer(amount);
+        } else {
+            RemunerationsInfo memory info = RemunerationsInfo(official, 1, amount);
+            _remunerationsQueue.push(info);
+        }
         return true;
     }
 

@@ -33,8 +33,6 @@ contract Town is TownInterface {
         uint256 _amount;
     }
 
-    //////////////////////////////////////////////////////////
-
     uint256 private _distributionPeriod;
     uint256 private _distributionPeriodsNumber;
     uint256 private _startRate;
@@ -84,7 +82,7 @@ contract Town is TownInterface {
         require(distributionPeriod > 0, "distributionPeriod wrong");
         require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
         require(startRate > 0, "startRate wrong");
-        require(totalSupplyTownTokens > 0 && totalSupplyTownTokens < 10 ** 15, "totalSupplyTownTokens wrong");
+        require(totalSupplyTownTokens > 0, "totalSupplyTownTokens wrong");
         require(minTokenBuyAmount > 0, "minTokenBuyAmount wrong");
         require(durationOfMinTokenBuyAmount > 0, "durationOfMinTokenBuyAmount wrong");
         require(maxTokenBuyAmount > 0, "maxTokenBuyAmount wrong");
@@ -374,7 +372,7 @@ contract Town is TownInterface {
         return true;
     }
 
-    function checkTownTokensRate(uint256 amount) public view returns (uint256) {
+    function IWantTakeTokensToAmount(uint256 amount) public view returns (uint256) {
         return amount.div(currentRate());
     }
 
@@ -382,9 +380,9 @@ contract Town is TownInterface {
         require(holder != address(0), "holder address cannot be null");
 
         uint256 amount = msg.value;
-        uint256 tokenAmount = checkTownTokensRate(amount);
+        uint256 tokenAmount = IWantTakeTokensToAmount(amount);
         uint256 rate = currentRate();
-        if (_buyersCount < _durationOfMinTokenBuyAmount && tokenAmount > _minTokenBuyAmount) {
+        if (_buyersCount < _durationOfMinTokenBuyAmount && tokenAmount < _minTokenBuyAmount) {
             return false;
         }
         if (tokenAmount >= _maxTokenBuyAmount) {

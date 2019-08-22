@@ -21,7 +21,7 @@ contract TownToken is ERC20, Ownable {
     TownInterface _town;
 
     constructor (uint256 totalSupply, address townContract) public {
-        _mint(msg.sender, totalSupply * (10 ** uint256(decimals)));
+        _mint(msg.sender, totalSupply);
         _town = TownInterface(townContract);
     }
 
@@ -69,6 +69,6 @@ contract TownToken is ERC20, Ownable {
             }
         }
 
-        return ERC20(address(this)).transfer(recipient, amount);
+        return super.transfer(recipient, amount);
     }
 }

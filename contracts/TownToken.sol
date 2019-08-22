@@ -2,7 +2,11 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/ownership/Ownable.sol";
-import "./Town.sol";
+
+interface TownInterface {
+    function checkProposal(address proposal) external returns (bool);
+    function voteOn(address externalToken, uint256 amount) external returns (bool);
+}
 
 
 contract TownToken is ERC20, Ownable {

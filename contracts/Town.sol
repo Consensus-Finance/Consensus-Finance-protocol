@@ -2,10 +2,6 @@ pragma solidity ^0.5.0;
 
 import "./TownToken.sol";
 
-interface TownInterface {
-    function checkProposal(address proposal) external returns (bool);
-    function voteOn(address externalToken, uint256 amount) external returns (bool);
-}
 
 contract Town is TownInterface {
     using SafeMath for uint256;
@@ -130,10 +126,6 @@ contract Town is TownInterface {
         } else {
             getTownTokens(msg.sender);
         }
-    }
-
-    function currentRate() internal view returns (uint256) {
-        return _startRate.mul(_buyersCount.add(1));
     }
 
     function token() external view returns (IERC20) {
@@ -455,5 +447,9 @@ contract Town is TownInterface {
         }
 
         return true;
+    }
+
+    function currentRate() internal view returns (uint256) {
+        return _startRate.mul(_buyersCount.add(1));
     }
 }

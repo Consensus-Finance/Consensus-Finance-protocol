@@ -32,7 +32,7 @@ contract Town is TownInterface {
     }
 
     struct RemunerationsInfo {
-        address _address;
+        address payable _address;
         uint256 _priority;
         uint256 _amount;
     }
@@ -67,6 +67,8 @@ contract Town is TownInterface {
 
     mapping (address => uint256) private _officialsLedger;
     address[] private _officialsLedgerAddresses;
+
+    address[] private _externalTokensWithWight;
 
     modifier onlyTownTokenSmartContract {
         require(msg.sender == address(_token));
@@ -267,7 +269,8 @@ contract Town is TownInterface {
         require(now > (_lastDistributionsDate + _distributionPeriod), "distribution time has not yet arrived");
 
         uint256 sumWeight = 0;
-        address[] memory externalTokensWithWight;
+        address[] memory tempArray;
+        _externalTokensWithWight = tempArray;
         for (uint256 i = 0; i < _externalTokensAddresses.length; ++i) {
             ExternalToken memory externalToken = _externalTokens[_externalTokensAddresses[i]];
             if (externalToken._weight > 0) {
@@ -280,7 +283,7 @@ contract Town is TownInterface {
                 }
                 if (sumExternalTokens > _minExternalTokensAmount) {
                     sumWeight = sumWeight.add(externalToken._weight);
-                    externalTokensWithWight.push[_externalTokensAddresses[i]];
+                    _externalTokensWithWight.push(_externalTokensAddresses[i]);
                 } else {
                     externalToken._weight = 0;
                 }
@@ -294,8 +297,8 @@ contract Town is TownInterface {
         }
 
         uint256 fullBalance = address(this).balance;
-        for (uint256 i = 0; i < externalTokensWithWight.length; ++i) {
-            ExternalToken memory externalToken = _externalTokens[externalTokensWithWight[i]];
+        for (uint256 i = 0; i < _externalTokensWithWight.length; ++i) {
+            ExternalToken memory externalToken = _externalTokens[_externalTokensWithWight[i]];
             uint256 sumExternalTokens = 0;
             for (uint256 j = 0; j < externalToken._entities.length; ++j) {
                 sumExternalTokens = sumExternalTokens.add(externalToken._entities[j]._distributionAmount);
@@ -360,18 +363,18 @@ contract Town is TownInterface {
         for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
             ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
             delete _townHoldersLedger[holder][externalTokensForHolder[i]];
-            externalTokensForHolder.length--;
+            _ledgerExternalTokensAddresses[holder].length--;
         }
         delete _ledgerExternalTokensAddresses[holder];
         return true;
     }
 
-    function claimFunds(address official) external returns (bool) {
+    function claimFunds(address payable official) external returns (bool) {
         require(_officialsLedger[official] == 0, "official address not fount in ledger");
 
         uint256 amount = _officialsLedger[official];
         if (address(this).balance >= amount) {
-            address(this).transfer(amount);
+            official.transfer(amount);
         } else {
             RemunerationsInfo memory info = RemunerationsInfo(official, 1, amount);
             _remunerationsQueue.push(info);

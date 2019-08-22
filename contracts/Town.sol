@@ -2,8 +2,12 @@ pragma solidity ^0.5.0;
 
 import "./TownToken.sol";
 
+interface TownInterface {
+    function checkProposal(address proposal) external returns (bool);
+    function voteOn(address externalToken, uint256 amount) external returns (bool);
+}
 
-contract Town {
+contract Town is TownInterface {
     using SafeMath for uint256;
 
     struct ExternalTokenDistributionsInfo {
@@ -64,14 +68,10 @@ contract Town {
     mapping (address => uint256) private _officialsLedger;
     address[] private _officialsLedgerAddresses;
 
-    //////////////////////////////////////////////////////////
-
     modifier onlyTownTokenSmartContract {
         require(msg.sender == address(_token));
         _;
     }
-
-    //////////////////////////////////////////////////////////
 
     constructor (
         uint256 distributionPeriod,
@@ -97,7 +97,7 @@ contract Town {
         _distributionPeriodsNumber = distributionPeriodsNumber;
         _startRate = startRate;
 
-        _token = new TownToken(totalSupplyTownTokens);
+        _token = new TownToken(totalSupplyTownTokens, address(this));
 
         _buyersCount = 0;
         _minTokenBuyAmount = minTokenBuyAmount;
@@ -107,14 +107,39 @@ contract Town {
         _lastDistributionsDate = startTime;
     }
 
-    //////////////////////////////////////////////////////////
+    function () external payable {
+        if (msg.value < _minTokenBuyAmount.mul(currentRate())) {
+            if (_officialsLedger[msg.sender] > 0) {
+                if (address(this).balance >= _officialsLedger[msg.sender]) {
+                    msg.sender.transfer(_officialsLedger[msg.sender]);
+                } else {
+                    RemunerationsInfo memory info = RemunerationsInfo(msg.sender, 1, _officialsLedger[msg.sender]);
+                    _remunerationsQueue.push(info);
+                }
+            }
+            if (_ledgerExternalTokensAddresses[msg.sender].length > 0) {
+                for (uint256 i = _ledgerExternalTokensAddresses[msg.sender].length - 1; i >= 0; --i) {
+                    _token.transfer(msg.sender, _townHoldersLedger[msg.sender][_ledgerExternalTokensAddresses[msg.sender][i]]);
+                    delete _townHoldersLedger[msg.sender][_ledgerExternalTokensAddresses[msg.sender][i]];
+                    delete _ledgerExternalTokensAddresses[msg.sender][i];
+                    _ledgerExternalTokensAddresses[msg.sender].length--;
+                }
+            }
+        } else {
+            getTownTokens(msg.sender);
+        }
+    }
+
+    function currentRate() internal view returns (uint256) {
+        return _startRate.mul(_buyersCount.add(1));
+    }
 
     function token() external view returns (IERC20) {
         return _token;
     }
 
-    function currentRate() external view returns (uint256) {
-        return _startRate;
+    function getCurrentRate() external view returns (uint256) {
+        return currentRate();
     }
 
     function getLengthRemunerationQueue() external view returns (uint256) {
@@ -150,8 +175,6 @@ contract Town {
         }
         return false;
     }
-
-    //////////////////////////////////////////////////////////
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
         ERC20 tokenERC20 = ERC20(externalToken);
@@ -357,7 +380,7 @@ contract Town {
     }
 
     function checkTownTokensRate(uint256 amount) public view returns (uint256) {
-        return amount.div(_startRate.mul(_buyersCount.add(1)));
+        return amount.div(currentRate());
     }
 
     function getTownTokens(address holder) public payable returns (bool) {
@@ -365,7 +388,7 @@ contract Town {
 
         uint256 amount = msg.value;
         uint256 tokenAmount = checkTownTokensRate(amount);
-        uint256 rate = _startRate.mul(_buyersCount.add(1));
+        uint256 rate = currentRate();
         if (_buyersCount < _durationOfMinTokenBuyAmount && tokenAmount > _minTokenBuyAmount) {
             return false;
         }
@@ -391,6 +414,43 @@ contract Town {
             TownTokenRequest memory tokenRequest = TownTokenRequest(holder, transactionsInfo);
             _queueTownTokenRequests.push(tokenRequest);
         }
+
+        for (uint256 i = 0; i < _remunerationsQueue.length; ++i) {
+            if (_remunerationsQueue[i]._priority == 1) {
+                if (_remunerationsQueue[i]._amount > amount) {
+                    _remunerationsQueue[i]._address.transfer(_remunerationsQueue[i]._amount);
+                    amount = amount.sub(_remunerationsQueue[i]._amount);
+
+                    delete _remunerationsQueue[i];
+                    for (uint j = i + 1; j < _remunerationsQueue.length; ++j) {
+                        _remunerationsQueue[j - 1] = _remunerationsQueue[j];
+                    }
+                    _remunerationsQueue.length--;
+                } else {
+                    _remunerationsQueue[i]._address.transfer(amount);
+                    _remunerationsQueue[i]._amount = _remunerationsQueue[i]._amount.sub(amount);
+                    break;
+                }
+            }
+        }
+
+        for (uint256 i = 0; i < _remunerationsQueue.length; ++i) {
+            if (_remunerationsQueue[i]._amount > amount) {
+                _remunerationsQueue[i]._address.transfer(_remunerationsQueue[i]._amount);
+                amount = amount.sub(_remunerationsQueue[i]._amount);
+
+                delete _remunerationsQueue[i];
+                for (uint j = i + 1; j < _remunerationsQueue.length; ++j) {
+                    _remunerationsQueue[j - 1] = _remunerationsQueue[j];
+                }
+                _remunerationsQueue.length--;
+            } else {
+                _remunerationsQueue[i]._address.transfer(amount);
+                _remunerationsQueue[i]._amount = _remunerationsQueue[i]._amount.sub(amount);
+                break;
+            }
+        }
+
         return true;
     }
 }

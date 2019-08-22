@@ -14,11 +14,11 @@ contract TownToken is ERC20, Ownable {
 
     address[] private _holders;
 
-    Town _town;
+    TownInterface _town;
 
-    constructor (uint256 totalSupply) public {
+    constructor (uint256 totalSupply, address townContract) public {
         _mint(this.owner(), totalSupply * (10 ** uint256(this.decimals())));
-        _town = Town(this.owner());
+        _town = TownInterface(townContract);
     }
 
     function getHoldersCount() external view returns (uint256) {

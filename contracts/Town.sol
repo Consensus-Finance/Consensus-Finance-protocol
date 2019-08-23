@@ -328,6 +328,7 @@ contract Town is TownInterface {
             }
         }
 
+        _lastDistributionsDate = now;
         return true;
     }
 

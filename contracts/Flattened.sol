@@ -515,13 +515,14 @@ contract TownToken is ERC20, Ownable {
     string public constant symbol = "TTW";
     uint8 public constant decimals = 18;
 
+    bool public initiated;
+
     address[] private _holders;
 
     TownInterface _town;
 
-    constructor (uint256 totalSupply, address townContract) public {
-        _mint(msg.sender, totalSupply);
-        _town = TownInterface(townContract);
+    constructor () public {
+        initiated = false;
     }
 
     function getHoldersCount() external view returns (uint256) {
@@ -530,6 +531,13 @@ contract TownToken is ERC20, Ownable {
 
     function getHolderByIndex(uint256 index) external view returns (address) {
         return _holders[index];
+    }
+
+    function init (uint256 totalSupply, address townContract) onlyOwner public {
+        require(initiated == false, "contract already initiated");
+        _town = TownInterface(townContract);
+        _mint(townContract, totalSupply);
+        initiated = true;
     }
 
     function transfer(address recipient, uint256 amount) public returns (bool) {
@@ -667,16 +675,15 @@ contract Town is TownInterface {
         uint256 distributionPeriod,
         uint256 distributionPeriodsNumber,
         uint256 startRate,
-        uint256 totalSupplyTownTokens,
         uint256 minTokenBuyAmount,
         uint256 durationOfMinTokenBuyAmount,
         uint256 maxTokenBuyAmount,
         uint256 minExternalTokensAmount,
-        uint256 startTime) public {
+        uint256 startTime,
+        address tokenAddress) public {
         require(distributionPeriod > 0, "distributionPeriod wrong");
         require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
         require(startRate > 0, "startRate wrong");
-        require(totalSupplyTownTokens > 0, "totalSupplyTownTokens wrong");
         require(minTokenBuyAmount > 0, "minTokenBuyAmount wrong");
         require(durationOfMinTokenBuyAmount > 0, "durationOfMinTokenBuyAmount wrong");
         require(maxTokenBuyAmount > 0, "maxTokenBuyAmount wrong");
@@ -687,7 +694,7 @@ contract Town is TownInterface {
         _distributionPeriodsNumber = distributionPeriodsNumber;
         _startRate = startRate;
 
-        _token = new TownToken(totalSupplyTownTokens, address(this));
+        _token = TownToken(tokenAddress);
 
         _buyersCount = 0;
         _minTokenBuyAmount = minTokenBuyAmount;
@@ -698,22 +705,12 @@ contract Town is TownInterface {
     }
 
     function () external payable {
-        if (msg.value < _minTokenBuyAmount.mul(currentRate())) {
+        if (msg.value < currentRate()) {
             if (_officialsLedger[msg.sender] > 0) {
-                if (address(this).balance >= _officialsLedger[msg.sender]) {
-                    msg.sender.transfer(_officialsLedger[msg.sender]);
-                } else {
-                    RemunerationsInfo memory info = RemunerationsInfo(msg.sender, 1, _officialsLedger[msg.sender]);
-                    _remunerationsQueue.push(info);
-                }
+                claimFunds(msg.sender);
             }
             if (_ledgerExternalTokensAddresses[msg.sender].length > 0) {
-                for (uint256 i = _ledgerExternalTokensAddresses[msg.sender].length - 1; i >= 0; --i) {
-                    _token.transfer(msg.sender, _townHoldersLedger[msg.sender][_ledgerExternalTokensAddresses[msg.sender][i]]);
-                    delete _townHoldersLedger[msg.sender][_ledgerExternalTokensAddresses[msg.sender][i]];
-                    delete _ledgerExternalTokensAddresses[msg.sender][i];
-                    _ledgerExternalTokensAddresses[msg.sender].length--;
-                }
+                claimExternalTokens(msg.sender);
             }
         } else {
             getTownTokens(msg.sender);
@@ -756,10 +753,8 @@ contract Town is TownInterface {
     }
 
     function checkProposal(address proposal) external returns (bool) {
-        if (_externalTokens[proposal]._entities.length > 0) {
-            return true;
-        }
-        return false;
+        require(_externalTokens[proposal]._entities.length > 0, "proposal not found");
+        return true;
     }
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
@@ -936,24 +931,24 @@ contract Town is TownInterface {
 
     function voteOn(address externalToken, uint256 amount) external onlyTownTokenSmartContract returns (bool) {
         require(_externalTokens[externalToken]._entities.length > 0, "external token address not found");
-        require(now > (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
+        require(now < (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
 
         _externalTokens[externalToken]._weight = _externalTokens[externalToken]._weight.add(amount);
         return true;
     }
 
-    function claimExternalTokens(address holder) external returns (bool) {
+    function claimExternalTokens(address holder) public returns (bool) {
         address[] memory externalTokensForHolder = _ledgerExternalTokensAddresses[holder];
         for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
             ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
             delete _townHoldersLedger[holder][externalTokensForHolder[i]];
+            delete _ledgerExternalTokensAddresses[holder];
             _ledgerExternalTokensAddresses[holder].length--;
         }
-        delete _ledgerExternalTokensAddresses[holder];
         return true;
     }
 
-    function claimFunds(address payable official) external returns (bool) {
+    function claimFunds(address payable official) public returns (bool) {
         require(_officialsLedger[official] == 0, "official address not fount in ledger");
 
         uint256 amount = _officialsLedger[official];

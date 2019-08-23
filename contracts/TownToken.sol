@@ -16,13 +16,14 @@ contract TownToken is ERC20, Ownable {
     string public constant symbol = "TTW";
     uint8 public constant decimals = 18;
 
+    bool public initiated;
+
     address[] private _holders;
 
     TownInterface _town;
 
-    constructor (uint256 totalSupply, address townContract) public {
-        _mint(msg.sender, totalSupply);
-        _town = TownInterface(townContract);
+    constructor () public {
+        initiated = false;
     }
 
     function getHoldersCount() external view returns (uint256) {
@@ -31,6 +32,13 @@ contract TownToken is ERC20, Ownable {
 
     function getHolderByIndex(uint256 index) external view returns (address) {
         return _holders[index];
+    }
+
+    function init (uint256 totalSupply, address townContract) onlyOwner public {
+        require(initiated == false, "contract already initiated");
+        _town = TownInterface(townContract);
+        _mint(townContract, totalSupply);
+        initiated = true;
     }
 
     function transfer(address recipient, uint256 amount) public returns (bool) {

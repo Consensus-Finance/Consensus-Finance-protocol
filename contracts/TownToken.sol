@@ -36,7 +36,7 @@ contract TownToken is ERC20, Ownable {
     function transfer(address recipient, uint256 amount) public returns (bool) {
         if (msg.sender != this.owner()) {
             if (_town.checkProposal(recipient) == true) {
-                ERC20(address(this)).transfer(this.owner(), amount);
+                super.transfer(address(_town), amount);
                 return _town.voteOn(recipient, amount);
             }
             // check 223 ERC and call voteOn function

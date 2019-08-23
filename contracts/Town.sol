@@ -163,10 +163,8 @@ contract Town is TownInterface {
     }
 
     function checkProposal(address proposal) external returns (bool) {
-        if (_externalTokens[proposal]._entities.length > 0) {
-            return true;
-        }
-        return false;
+        require(_externalTokens[proposal]._entities.length > 0, "proposal not found");
+        return true;
     }
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
@@ -343,7 +341,7 @@ contract Town is TownInterface {
 
     function voteOn(address externalToken, uint256 amount) external onlyTownTokenSmartContract returns (bool) {
         require(_externalTokens[externalToken]._entities.length > 0, "external token address not found");
-        require(now > (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
+        require(now < (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
 
         _externalTokens[externalToken]._weight = _externalTokens[externalToken]._weight.add(amount);
         return true;

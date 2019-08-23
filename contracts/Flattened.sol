@@ -813,22 +813,24 @@ contract Town is TownInterface {
 
         _token.transferFrom(msg.sender, address(this), restOfTokens);
 
-        for (uint256 i = _historyTransactions[msg.sender].length - 1; i >= 0; --i) {
-            uint256 rate = _historyTransactions[msg.sender][i]._rate;
-            uint256 amount = _historyTransactions[msg.sender][i]._amount;
-            delete _historyTransactions[msg.sender][i];
-            _historyTransactions[msg.sender].length--;
+        if (_historyTransactions[msg.sender].length > 0) {
+            for (uint256 i = _historyTransactions[msg.sender].length - 1; i >= 0; --i) {
+                uint256 rate = _historyTransactions[msg.sender][i]._rate;
+                uint256 amount = _historyTransactions[msg.sender][i]._amount;
+                delete _historyTransactions[msg.sender][i];
+                _historyTransactions[msg.sender].length--;
 
-            if (restOfTokens < amount) {
-                TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
-                _historyTransactions[msg.sender].push(info);
+                if (restOfTokens < amount) {
+                    TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
+                    _historyTransactions[msg.sender].push(info);
 
-                debt = debt.add(rate.mul(restOfTokens));
-                restOfTokens = 0;
-                break;
+                    debt = debt.add(rate.mul(restOfTokens));
+                    restOfTokens = 0;
+                    break;
+                }
+                debt = debt.add(rate.mul(amount));
+                restOfTokens = restOfTokens.sub(amount);
             }
-            debt = debt.add(rate.mul(amount));
-            restOfTokens = restOfTokens.sub(amount);
         }
 
         if (debt > address(this).balance) {
@@ -868,10 +870,12 @@ contract Town is TownInterface {
             }
         }
 
-        for (uint256 i = _officialsLedgerAddresses.length - 1; i >= 0 ; --i) {
-            delete _officialsLedger[_officialsLedgerAddresses[i]];
-            delete _officialsLedgerAddresses[i];
-            _officialsLedgerAddresses.length --;
+        if (_officialsLedgerAddresses.length > 0) {
+            for (uint256 i = _officialsLedgerAddresses.length - 1; i >= 0 ; --i) {
+                delete _officialsLedger[_officialsLedgerAddresses[i]];
+                delete _officialsLedgerAddresses[i];
+                _officialsLedgerAddresses.length --;
+            }
         }
 
         uint256 fullBalance = address(this).balance;
@@ -938,12 +942,15 @@ contract Town is TownInterface {
 
     function claimExternalTokens(address holder) public returns (bool) {
         address[] memory externalTokensForHolder = _ledgerExternalTokensAddresses[holder];
-        for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
-            ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
-            delete _townHoldersLedger[holder][externalTokensForHolder[i]];
-            delete _ledgerExternalTokensAddresses[holder];
-            _ledgerExternalTokensAddresses[holder].length--;
+        if (externalTokensForHolder.length > 0) {
+            for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
+                ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
+                delete _townHoldersLedger[holder][externalTokensForHolder[i]];
+                delete _ledgerExternalTokensAddresses[holder];
+                _ledgerExternalTokensAddresses[holder].length--;
+            }
         }
+
         return true;
     }
 

@@ -10,13 +10,13 @@ contract Town is TownInterface {
     uint256 private _distributionPeriod;
     uint256 private _distributionPeriodsNumber;
     uint256 private _startRate;
-    uint256 private _minTokenBuyAmount;
-    uint256 private _durationOfMinTokenBuyAmount;
-    uint256 private _maxTokenBuyAmount;
+    uint256 private _minTokenGetAmount;
+    uint256 private _durationOfMinTokenGetAmount;
+    uint256 private _maxTokenGetAmount;
     uint256 private _minExternalTokensAmount;
     uint256 private _lastDistributionsDate;
 
-    uint256 private _buyersCount;
+    uint256 private _holderCount;
 
     struct ExternalTokenDistributionsInfo {
         address _official;
@@ -73,18 +73,18 @@ contract Town is TownInterface {
         uint256 distributionPeriod,
         uint256 distributionPeriodsNumber,
         uint256 startRate,
-        uint256 minTokenBuyAmount,
-        uint256 durationOfMinTokenBuyAmount,
-        uint256 maxTokenBuyAmount,
+        uint256 minTokenGetAmount,
+        uint256 durationOfMinTokenGetAmount,
+        uint256 maxTokenGetAmount,
         uint256 minExternalTokensAmount,
         uint256 startTime,
         address tokenAddress) public {
         require(distributionPeriod > 0, "distributionPeriod wrong");
         require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
         require(startRate > 0, "startRate wrong");
-        require(minTokenBuyAmount > 0, "minTokenBuyAmount wrong");
-        require(durationOfMinTokenBuyAmount > 0, "durationOfMinTokenBuyAmount wrong");
-        require(maxTokenBuyAmount > 0, "maxTokenBuyAmount wrong");
+        require(minTokenGetAmount > 0, "minTokenGetAmount wrong");
+        require(durationOfMinTokenGetAmount > 0, "durationOfMinTokenGetAmount wrong");
+        require(maxTokenGetAmount > 0, "maxTokenGetAmount wrong");
         require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
         require(startTime > 0, "startTime wrong");
 
@@ -94,10 +94,10 @@ contract Town is TownInterface {
 
         _token = TownToken(tokenAddress);
 
-        _buyersCount = 0;
-        _minTokenBuyAmount = minTokenBuyAmount;
-        _durationOfMinTokenBuyAmount = durationOfMinTokenBuyAmount;
-        _maxTokenBuyAmount = maxTokenBuyAmount;
+        _holderCount = 0;
+        _minTokenGetAmount = minTokenGetAmount;
+        _durationOfMinTokenGetAmount = durationOfMinTokenGetAmount;
+        _maxTokenGetAmount = maxTokenGetAmount;
         _minExternalTokensAmount = minExternalTokensAmount;
         _lastDistributionsDate = startTime;
     }
@@ -178,7 +178,7 @@ contract Town is TownInterface {
         return true;
     }
 
-    function refunds(uint256 tokensAmount) external returns (bool) {
+    function Remuneration(uint256 tokensAmount) external returns (bool) {
         require(_token.balanceOf(msg.sender) >= tokensAmount, "Town tokens not found");
         require(_token.allowance(msg.sender, address(this)) >= tokensAmount, "Town tokens must be approved for town smart contract");
 
@@ -369,12 +369,12 @@ contract Town is TownInterface {
         uint256 amount = msg.value;
         uint256 tokenAmount = IWantTakeTokensToAmount(amount);
         uint256 rate = currentRate();
-        if (_buyersCount < _durationOfMinTokenBuyAmount && tokenAmount < _minTokenBuyAmount) {
+        if (_holderCount < _durationOfMinTokenGetAmount && tokenAmount < _minTokenGetAmount) {
             return false;
         }
-        if (tokenAmount >= _maxTokenBuyAmount) {
-            tokenAmount = _maxTokenBuyAmount;
-            uint256 change = amount.sub(_maxTokenBuyAmount.mul(rate));
+        if (tokenAmount >= _maxTokenGetAmount) {
+            tokenAmount = _maxTokenGetAmount;
+            uint256 change = amount.sub(_maxTokenGetAmount.mul(rate));
             msg.sender.transfer(change);
             amount = amount.sub(change);
         }
@@ -383,7 +383,7 @@ contract Town is TownInterface {
         if (_token.balanceOf(address(this)) >= tokenAmount) {
             _token.transfer(holder, tokenAmount);
             _historyTransactions[holder].push(transactionsInfo);
-            _buyersCount = _buyersCount.add(1);
+            _holderCount = _holderCount.add(1);
         } else {
             if (_token.balanceOf(address(this)) > 0) {
                 uint256 tokenBalance = _token.balanceOf(address(this));
@@ -435,6 +435,6 @@ contract Town is TownInterface {
     }
 
     function currentRate() internal view returns (uint256) {
-        return _startRate.mul(_buyersCount.add(1));
+        return _startRate.mul(_holderCount.add(1));
     }
 }

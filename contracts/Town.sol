@@ -1,6 +1,7 @@
 pragma solidity ^0.5.0;
 
 import "./TownToken.sol";
+import "./ExternalTokenTemplate.sol";
 
 
 contract Town is TownInterface {

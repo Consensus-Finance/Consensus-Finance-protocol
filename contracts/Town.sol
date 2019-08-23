@@ -7,6 +7,17 @@ import "./ExternalTokenTemplate.sol";
 contract Town is TownInterface {
     using SafeMath for uint256;
 
+    uint256 private _distributionPeriod;
+    uint256 private _distributionPeriodsNumber;
+    uint256 private _startRate;
+    uint256 private _minTokenBuyAmount;
+    uint256 private _durationOfMinTokenBuyAmount;
+    uint256 private _maxTokenBuyAmount;
+    uint256 private _minExternalTokensAmount;
+    uint256 private _lastDistributionsDate;
+
+    uint256 private _buyersCount;
+
     struct ExternalTokenDistributionsInfo {
         address _official;
         uint256 _distributionAmount;
@@ -34,19 +45,7 @@ contract Town is TownInterface {
         uint256 _amount;
     }
 
-    uint256 private _distributionPeriod;
-    uint256 private _distributionPeriodsNumber;
-    uint256 private _startRate;
-
     TownToken private _token;
-
-    uint256 private _buyersCount;
-    uint256 private _minTokenBuyAmount;
-    uint256 private _durationOfMinTokenBuyAmount;
-    uint256 private _maxTokenBuyAmount;
-
-    uint256 private _minExternalTokensAmount;
-    uint256 private _lastDistributionsDate;
 
     mapping (address => TransactionsInfo[]) private _historyTransactions;
 

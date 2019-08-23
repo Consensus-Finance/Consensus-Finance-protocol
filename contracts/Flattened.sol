@@ -752,8 +752,10 @@ contract Town is TownInterface {
     }
 
     function checkProposal(address proposal) external returns (bool) {
-        require(_externalTokens[proposal]._entities.length > 0, "proposal not found");
-        return true;
+        if (_externalTokens[proposal]._entities.length > 0) {
+            return true;
+        }
+        return false;
     }
 
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
@@ -929,6 +931,7 @@ contract Town is TownInterface {
             }
         }
 
+        _lastDistributionsDate = now;
         return true;
     }
 

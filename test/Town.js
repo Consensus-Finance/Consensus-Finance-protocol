@@ -7,13 +7,13 @@ const ExternalToken = artifacts.require("ExternalTokenTemplate");
 
 contract("Town test", async ([owner, official, holder]) => {
     beforeEach(async () => {
-        this.distributionPeriod = 5;
+        this.distributionPeriod = 24;
 
         this.externalToken = await ExternalToken.new(new BN(1000), {from: official});
         this.totalSupply = new BN(500000);
         this.townToken = await TownToken.new();
         this.town = await Town.new(this.distributionPeriod, "12", "16000000", "100", "50", "10000000000000000000000",
-            "100", "1566560025", this.townToken.address);
+            "100", "1566864000", this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });
 
@@ -106,7 +106,7 @@ contract("Town test", async ([owner, official, holder]) => {
 
         await this.externalToken.approve(this.town.address, new BN(50), {from: official});
         await this.town.sendExternalTokens(official, this.externalToken.address, {from: official});
-        time.increase(time.duration.days(this.distributionPeriod + 1));
+        time.increase(time.duration.hours(this.distributionPeriod + 1));
         await this.town.distributionSnapshot();
     });
 
@@ -115,13 +115,13 @@ contract("Town test", async ([owner, official, holder]) => {
         await this.town.sendExternalTokens(official, this.externalToken.address, {from: official});
         await this.town.getTownTokens(holder, {value: ether('0.001')});
 
-        time.increase(time.duration.days(this.distributionPeriod + 1));
+        time.increase(time.duration.hours(this.distributionPeriod + 1));
         await this.town.distributionSnapshot();
         await this.townToken.transfer(this.externalToken.address, new BN(30), {from: holder});
 
         await this.externalToken.approve(this.town.address, new BN(300), {from: official});
         await this.town.sendExternalTokens(official, this.externalToken.address, {from: official});
-        time.increase(time.duration.days(this.distributionPeriod + 1));
+        time.increase(time.duration.hours(this.distributionPeriod + 1));
         await this.town.distributionSnapshot();
         await this.town.claimFunds(official);
     });

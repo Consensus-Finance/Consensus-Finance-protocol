@@ -330,7 +330,7 @@ contract Town is TownInterface {
             }
         }
 
-        _lastDistributionsDate = now;
+        _lastDistributionsDate = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate);
         return true;
     }
 

@@ -1,0 +1,4 @@
+export default 'VM Exception while processing transaction: revert';
+
+// "5000000000000000000000000", "0xcbbe6ec46746218a5bed5b336ab86a0a22804d39"
+// "5", "12", "16000000", "100", "50", "10000000000000000000000", "100", "1566560025", "0x1459b55e171400dfbf69f834fa6e80232b014ce8"

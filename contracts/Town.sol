@@ -357,7 +357,7 @@ contract Town is TownInterface {
     }
 
     function claimFunds(address payable official) public returns (bool) {
-        require(_officialsLedger[official] == 0, "official address not fount in ledger");
+        require(_officialsLedger[official] != 0, "official address not found in ledger");
 
         uint256 amount = _officialsLedger[official];
         if (address(this).balance >= amount) {

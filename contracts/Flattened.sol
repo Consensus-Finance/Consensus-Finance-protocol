@@ -689,7 +689,7 @@ contract Town is TownInterface {
         require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
         require(startTime > 0, "startTime wrong");
 
-        _distributionPeriod = distributionPeriod * 1 days;
+        _distributionPeriod = distributionPeriod * 1 hours;
         _distributionPeriodsNumber = distributionPeriodsNumber;
         _startRate = startRate;
 
@@ -931,7 +931,7 @@ contract Town is TownInterface {
             }
         }
 
-        _lastDistributionsDate = now;
+        _lastDistributionsDate = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate);
         return true;
     }
 
@@ -958,7 +958,7 @@ contract Town is TownInterface {
     }
 
     function claimFunds(address payable official) public returns (bool) {
-        require(_officialsLedger[official] == 0, "official address not fount in ledger");
+        require(_officialsLedger[official] != 0, "official address not found in ledger");
 
         uint256 amount = _officialsLedger[official];
         if (address(this).balance >= amount) {

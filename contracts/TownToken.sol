@@ -34,7 +34,7 @@ contract TownToken is ERC20, Ownable {
         return _holders[index];
     }
 
-    function init (uint256 totalSupply, address townContract) onlyOwner public {
+    function init (uint256 totalSupply, address townContract) public onlyOwner {
         require(initiated == false, "contract already initiated");
         _town = TownInterface(townContract);
         _mint(townContract, totalSupply);

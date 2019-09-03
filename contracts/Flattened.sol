@@ -533,7 +533,7 @@ contract TownToken is ERC20, Ownable {
         return _holders[index];
     }
 
-    function init (uint256 totalSupply, address townContract) onlyOwner public {
+    function init (uint256 totalSupply, address townContract) public onlyOwner {
         require(initiated == false, "contract already initiated");
         _town = TownInterface(townContract);
         _mint(townContract, totalSupply);
@@ -560,11 +560,10 @@ contract TownToken is ERC20, Ownable {
             _holders.push(recipient);
         }
 
-        if (balanceOf(address(this)) == amount && address(this) != this.owner()) {
+        if (balanceOf(address(msg.sender)) == amount && address(msg.sender) != this.owner()) {
             uint i = 0;
             for (; i < _holders.length; ++i) {
-                if (_holders[i] == address(this)) {
-                    found = true;
+                if (_holders[i] == address(msg.sender)) {
                     break;
                 }
             }
@@ -666,7 +665,7 @@ contract Town is TownInterface {
     address[] private _externalTokensWithWight;
 
     modifier onlyTownTokenSmartContract {
-        require(msg.sender == address(_token));
+        require(msg.sender == address(_token), "only town token smart contract can call this function");
         _;
     }
 
@@ -720,6 +719,42 @@ contract Town is TownInterface {
         return _token;
     }
 
+    function distributionPeriod() external view returns (uint256) {
+        return _distributionPeriod;
+    }
+
+    function distributionPeriodsNumber() external view returns (uint256) {
+        return _distributionPeriodsNumber;
+    }
+
+    function startRate() external view returns (uint256) {
+        return _startRate;
+    }
+
+    function minTokenGetAmount() external view returns (uint256) {
+        return _minTokenGetAmount;
+    }
+
+    function durationOfMinTokenGetAmount() external view returns (uint256) {
+        return _durationOfMinTokenGetAmount;
+    }
+
+    function maxTokenGetAmount() external view returns (uint256) {
+        return _maxTokenGetAmount;
+    }
+
+    function minExternalTokensAmount() external view returns (uint256) {
+        return _minExternalTokensAmount;
+    }
+
+    function lastDistributionsDate() external view returns (uint256) {
+        return _lastDistributionsDate;
+    }
+
+    function holderCount() external view returns (uint256) {
+        return _holderCount;
+    }
+
     function getCurrentRate() external view returns (uint256) {
         return currentRate();
     }
@@ -745,7 +780,7 @@ contract Town is TownInterface {
         uint256 amount = 0;
         uint256 tokenAmount = 0;
         for (uint256 i = 0; i < _historyTransactions[msg.sender].length; ++i) {
-            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate));
+            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate).div(10 ** 18));
             tokenAmount = tokenAmount.add(_historyTransactions[msg.sender][i]._amount);
         }
         return (amount, tokenAmount);
@@ -781,7 +816,7 @@ contract Town is TownInterface {
         return true;
     }
 
-    function Remuneration(uint256 tokensAmount) external returns (bool) {
+    function remuneration(uint256 tokensAmount) external returns (bool) {
         require(_token.balanceOf(msg.sender) >= tokensAmount, "Town tokens not found");
         require(_token.allowance(msg.sender, address(this)) >= tokensAmount, "Town tokens must be approved for town smart contract");
 
@@ -826,11 +861,12 @@ contract Town is TownInterface {
                     TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
                     _historyTransactions[msg.sender].push(info);
 
-                    debt = debt.add(rate.mul(restOfTokens));
+                    debt = debt.add(restOfTokens.mul(rate).div(10 ** 18));
                     restOfTokens = 0;
                     break;
                 }
-                debt = debt.add(rate.mul(amount));
+
+                debt = debt.add(amount.mul(rate).div(10 ** 18));
                 restOfTokens = restOfTokens.sub(amount);
             }
         }
@@ -971,7 +1007,7 @@ contract Town is TownInterface {
     }
 
     function IWantTakeTokensToAmount(uint256 amount) public view returns (uint256) {
-        return amount.div(currentRate());
+        return amount.div(currentRate()).mul(10 ** 18);
     }
 
     function getTownTokens(address holder) public payable returns (bool) {
@@ -985,7 +1021,7 @@ contract Town is TownInterface {
         }
         if (tokenAmount >= _maxTokenGetAmount) {
             tokenAmount = _maxTokenGetAmount;
-            uint256 change = amount.sub(_maxTokenGetAmount.mul(rate));
+            uint256 change = amount.sub(_maxTokenGetAmount.mul(rate).div(10 ** 18));
             msg.sender.transfer(change);
             amount = amount.sub(change);
         }

@@ -61,11 +61,10 @@ contract TownToken is ERC20, Ownable {
             _holders.push(recipient);
         }
 
-        if (balanceOf(address(this)) == amount && address(this) != this.owner()) {
+        if (balanceOf(address(msg.sender)) == amount && address(msg.sender) != this.owner()) {
             uint i = 0;
             for (; i < _holders.length; ++i) {
-                if (_holders[i] == address(this)) {
-                    found = true;
+                if (_holders[i] == address(msg.sender)) {
                     break;
                 }
             }

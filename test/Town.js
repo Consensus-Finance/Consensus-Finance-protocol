@@ -3,6 +3,7 @@ const {
     ether,
     expectRevert,
     time,
+    balance,
 } = require('openzeppelin-test-helpers');
 const { expect } = require('chai');
 
@@ -14,11 +15,12 @@ contract('Town test', async ([owner, official, holder]) => {
     beforeEach(async () => {
         this.distributionPeriod = 24;
 
-        this.externalToken = await ExternalToken.new(new BN(1000), {from: official});
-        this.totalSupply = new BN(500000);
+        this.externalToken = await ExternalToken.new(new BN(1000), { from: official });
+        this.totalSupply = new BN('500000000000000000000');
         this.townToken = await TownToken.new();
+        this.initialRate = new BN('20000000000000');
         const nowTimestamp = await time.latest();
-        this.town = await Town.new(this.distributionPeriod, '12', '16000000', '100', '50', '10000000000000000000000',
+        this.town = await Town.new(this.distributionPeriod, '12', this.initialRate, '100', '50', '10000000000000000000000',
             '100', nowTimestamp - 1800, this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });
@@ -64,25 +66,26 @@ contract('Town test', async ([owner, official, holder]) => {
     });
 
     it('call getTownTokens() and checking the Town token holders', async () => {
-        await this.town.getTownTokens(holder, { value: ether('1') });
-        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN(500000));
+        await this.town.getTownTokens(holder, { value: ether('0.003') });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('150000000000000000000'));
         expect(await this.townToken.getHoldersCount.call()).to.be.bignumber.equal(new BN(1));
         expect(await this.townToken.getHolderByIndex.call(0)).to.equal(holder);
 
-        await this.townToken.transfer(this.town.address, new BN(100000), {from: holder});
-        await this.town.getTownTokens(holder, {value: ether('0.0000001')});
+        await this.townToken.transfer(this.town.address, new BN('100000000000000000000'), { from: holder });
+        await this.town.getTownTokens(holder, { value: ether('0.0000001') });
+        await this.town.getTownTokens(holder, { value: ether('0.003') });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('125000000000000000000'));
 
-        const result = await this.town.getMyTownTokens.call({from: holder});
-        expect(result['0']).to.be.bignumber.equal(new BN(100000000000));
-        expect(result['1']).to.be.bignumber.equal(new BN(6250));
+        const result = await this.town.getMyTownTokens.call({ from: holder });
+        expect(result['0']).to.be.bignumber.equal(new BN('6000000000000000'));
+        expect(result['1']).to.be.bignumber.equal(new BN('225000000000000000000'));
     });
 
     it('checking current rate and call IWantTakeTokensToAmount()', async () => {
         const value = ether('1');
-        const initialRate = new BN(16000000);
 
         // expect(await this.town.getCurrentRate.call()).to.be.bignumber.equal(initialRate); // TODO: Invalid number of parameters for "getCurrentRate". Got 0 expected 1!
-        expect(await this.town.IWantTakeTokensToAmount.call(value)).to.be.bignumber.equal(value.div(initialRate));
+        expect(await this.town.IWantTakeTokensToAmount.call(value)).to.be.bignumber.equal(value.div(this.initialRate).mul(new BN('1000000000000000000')));
     });
 
     it('sending ether to the Town contract', async () => {
@@ -100,11 +103,18 @@ contract('Town test', async ([owner, official, holder]) => {
 
     it('call remuneration()', async () => {
         await expectRevert(this.town.remuneration(new BN(10), { from: holder }), 'Town tokens not found');
-        await this.town.getTownTokens(holder, { value: ether('0.0001') });
-        await this.townToken.approve(this.town.address, new BN(100), { from: holder });
-        await expectRevert(this.town.remuneration(new BN(200), { from: holder }),
+        await this.town.getTownTokens(holder, { value: ether('0.003') });
+        await this.townToken.approve(this.town.address, new BN('100000000000000000000'), { from: holder });
+        await expectRevert(this.town.remuneration(new BN('100000000000000000001'), { from: holder }),
             'Town tokens must be approved for town smart contract');
-        await this.town.remuneration(new BN(100), { from: holder });
+        const townBalanceBefore = await balance.current(this.town.address);
+        await this.town.remuneration(new BN('100000000000000000000'), { from: holder });
+        const townBalanceAfter = await balance.current(this.town.address);
+        expect(townBalanceBefore.sub(townBalanceAfter)).to.be.bignumber.equal(ether('0.002'));
+
+        const result = await this.town.getMyTownTokens.call({ from: holder });
+        expect(result['0']).to.be.bignumber.equal(new BN('1000000000000000'));
+        expect(result['1']).to.be.bignumber.equal(new BN('50000000000000000000'));
     });
 
     it('call distributionSnapshot()', async () => {

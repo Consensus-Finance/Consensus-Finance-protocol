@@ -180,7 +180,7 @@ contract Town is TownInterface {
         uint256 amount = 0;
         uint256 tokenAmount = 0;
         for (uint256 i = 0; i < _historyTransactions[msg.sender].length; ++i) {
-            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate));
+            amount = amount.add(_historyTransactions[msg.sender][i]._amount.mul(_historyTransactions[msg.sender][i]._rate).div(10 ** 18));
             tokenAmount = tokenAmount.add(_historyTransactions[msg.sender][i]._amount);
         }
         return (amount, tokenAmount);
@@ -261,11 +261,12 @@ contract Town is TownInterface {
                     TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
                     _historyTransactions[msg.sender].push(info);
 
-                    debt = debt.add(rate.mul(restOfTokens));
+                    debt = debt.add(restOfTokens.mul(rate).div(10 ** 18));
                     restOfTokens = 0;
                     break;
                 }
-                debt = debt.add(rate.mul(amount));
+
+                debt = debt.add(amount.mul(rate).div(10 ** 18));
                 restOfTokens = restOfTokens.sub(amount);
             }
         }
@@ -406,7 +407,7 @@ contract Town is TownInterface {
     }
 
     function IWantTakeTokensToAmount(uint256 amount) public view returns (uint256) {
-        return amount.div(currentRate());
+        return amount.div(currentRate()).mul(10 ** 18);
     }
 
     function getTownTokens(address holder) public payable returns (bool) {
@@ -420,7 +421,7 @@ contract Town is TownInterface {
         }
         if (tokenAmount >= _maxTokenGetAmount) {
             tokenAmount = _maxTokenGetAmount;
-            uint256 change = amount.sub(_maxTokenGetAmount.mul(rate));
+            uint256 change = amount.sub(_maxTokenGetAmount.mul(rate).div(10 ** 18));
             msg.sender.transfer(change);
             amount = amount.sub(change);
         }

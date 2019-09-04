@@ -677,16 +677,13 @@ contract Town is TownInterface {
         uint256 durationOfMinTokenGetAmount,
         uint256 maxTokenGetAmount,
         uint256 minExternalTokensAmount,
-        uint256 startTime,
         address tokenAddress) public {
         require(distributionPeriod > 0, "distributionPeriod wrong");
         require(distributionPeriodsNumber > 0, "distributionPeriodsNumber wrong");
-        require(startRate > 0, "startRate wrong");
         require(minTokenGetAmount > 0, "minTokenGetAmount wrong");
         require(durationOfMinTokenGetAmount > 0, "durationOfMinTokenGetAmount wrong");
         require(maxTokenGetAmount > 0, "maxTokenGetAmount wrong");
         require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
-        require(startTime > 0, "startTime wrong");
 
         _distributionPeriod = distributionPeriod * 1 hours;
         _distributionPeriodsNumber = distributionPeriodsNumber;
@@ -699,7 +696,7 @@ contract Town is TownInterface {
         _durationOfMinTokenGetAmount = durationOfMinTokenGetAmount;
         _maxTokenGetAmount = maxTokenGetAmount;
         _minExternalTokensAmount = minExternalTokensAmount;
-        _lastDistributionsDate = startTime;
+        _lastDistributionsDate = (now.div(86400).add(1)).mul(86400);
     }
 
     function () external payable {

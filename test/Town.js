@@ -19,9 +19,8 @@ contract('Town test', async ([owner, official, holder]) => {
         this.totalSupply = new BN('500000000000000000000');
         this.townToken = await TownToken.new();
         this.initialRate = new BN('20000000000000');
-        const nowTimestamp = await time.latest();
         this.town = await Town.new(this.distributionPeriod, '12', this.initialRate, '100', '50', '10000000000000000000000',
-            '100', nowTimestamp - 1800, this.townToken.address);
+            '100', this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });
 
@@ -122,6 +121,8 @@ contract('Town test', async ([owner, official, holder]) => {
 
         await this.externalToken.approve(this.town.address, new BN(50), { from: official });
         await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
+        const timeShift = 86400 - (await time.latest() % 86400);
+        time.increase(timeShift);
         time.increase(time.duration.hours(this.distributionPeriod + 1));
         await this.town.distributionSnapshot();
     });
@@ -131,6 +132,8 @@ contract('Town test', async ([owner, official, holder]) => {
         await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
         await this.town.getTownTokens(holder, { value: ether('0.001') });
 
+        const timeShift = 86400 - (await time.latest() % 86400);
+        time.increase(timeShift);
         time.increase(time.duration.hours(this.distributionPeriod + 1));
         await this.town.distributionSnapshot();
         await this.townToken.transfer(this.externalToken.address, new BN(30), { from: holder });

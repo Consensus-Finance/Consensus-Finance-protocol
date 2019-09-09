@@ -404,7 +404,7 @@ contract Town is TownInterface {
     }
 
     function IWantTakeTokensToAmount(uint256 amount) public view returns (uint256) {
-        return amount.div(currentRate()).mul(10 ** 18);
+        return amount.mul(10 ** 18).div(currentRate());
     }
 
     function getTownTokens(address holder) public payable returns (bool) {
@@ -423,8 +423,8 @@ contract Town is TownInterface {
             amount = amount.sub(change);
         }
 
-        TransactionsInfo memory transactionsInfo = TransactionsInfo(rate, tokenAmount);
         if (_token.balanceOf(address(this)) >= tokenAmount) {
+            TransactionsInfo memory transactionsInfo = TransactionsInfo(rate, tokenAmount);
             _token.transfer(holder, tokenAmount);
             _historyTransactions[holder].push(transactionsInfo);
             _holderCount = _holderCount.add(1);
@@ -435,6 +435,7 @@ contract Town is TownInterface {
                 tokenAmount = tokenAmount.sub(tokenBalance);
             }
 
+            TransactionsInfo memory transactionsInfo = TransactionsInfo(rate, tokenAmount);
             TownTokenRequest memory tokenRequest = TownTokenRequest(holder, transactionsInfo);
             _queueTownTokenRequests.push(tokenRequest);
         }

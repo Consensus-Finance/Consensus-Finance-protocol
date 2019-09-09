@@ -19,7 +19,7 @@ contract('Town test', async ([owner, official, holder]) => {
         this.totalSupply = new BN('500000000000000000000');
         this.townToken = await TownToken.new();
         this.initialRate = new BN('20000000000000');
-        this.town = await Town.new(this.distributionPeriod, '12', this.initialRate, '100', '50', '10000000000000000000000',
+        this.town = await Town.new(this.distributionPeriod, '12', this.initialRate, '1000000000000000000', '50', '10000000000000000000000',
             '100', this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });

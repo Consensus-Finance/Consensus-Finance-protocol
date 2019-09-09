@@ -16,7 +16,7 @@ contract Town is TownInterface {
     uint256 private _minExternalTokensAmount;
     uint256 private _lastDistributionsDate;
 
-    uint256 private _holderCount;
+    uint256 private _transactionsCount;
 
     struct ExternalTokenDistributionsInfo {
         address _official;
@@ -91,7 +91,7 @@ contract Town is TownInterface {
 
         _token = TownToken(tokenAddress);
 
-        _holderCount = 0;
+        _transactionsCount = 0;
         _minTokenGetAmount = minTokenGetAmount;
         _durationOfMinTokenGetAmount = durationOfMinTokenGetAmount;
         _maxTokenGetAmount = maxTokenGetAmount;
@@ -148,8 +148,8 @@ contract Town is TownInterface {
         return _lastDistributionsDate;
     }
 
-    function holderCount() external view returns (uint256) {
-        return _holderCount;
+    function transactionsCount() external view returns (uint256) {
+        return _transactionsCount;
     }
 
     function getCurrentRate() external view returns (uint256) {
@@ -413,7 +413,7 @@ contract Town is TownInterface {
         uint256 amount = msg.value;
         uint256 tokenAmount = IWantTakeTokensToAmount(amount);
         uint256 rate = currentRate();
-        if (_holderCount < _durationOfMinTokenGetAmount && tokenAmount < _minTokenGetAmount) {
+        if (_transactionsCount < _durationOfMinTokenGetAmount && tokenAmount < _minTokenGetAmount) {
             return false;
         }
         if (tokenAmount >= _maxTokenGetAmount) {
@@ -424,14 +424,16 @@ contract Town is TownInterface {
         }
 
         if (_token.balanceOf(address(this)) >= tokenAmount) {
-            TransactionsInfo memory transactionsInfo = TransactionsInfo(rate, tokenAmount);
+            TransactionsInfo memory transactionsHistory = TransactionsInfo(rate, tokenAmount);
             _token.transfer(holder, tokenAmount);
-            _historyTransactions[holder].push(transactionsInfo);
-            _holderCount = _holderCount.add(1);
+            _historyTransactions[holder].push(transactionsHistory);
+            _transactionsCount = _transactionsCount.add(1);
         } else {
             if (_token.balanceOf(address(this)) > 0) {
                 uint256 tokenBalance = _token.balanceOf(address(this));
                 _token.transfer(holder, tokenBalance);
+                TransactionsInfo memory transactionsHistory = TransactionsInfo(rate, tokenBalance);
+                _historyTransactions[holder].push(transactionsHistory);
                 tokenAmount = tokenAmount.sub(tokenBalance);
             }
 
@@ -480,6 +482,6 @@ contract Town is TownInterface {
     }
 
     function currentRate() internal view returns (uint256) {
-        return _startRate.mul(_holderCount.add(1));
+        return _startRate.mul(_transactionsCount.add(1));
     }
 }

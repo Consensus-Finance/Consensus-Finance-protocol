@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/ownership/Ownable.sol";
 interface TownInterface {
     function checkProposal(address proposal) external returns (bool);
     function voteOn(address externalToken, uint256 amount) external returns (bool);
+    function remuneration(address recipient, uint256 tokensAmount) external returns (bool);
 }
 
 
@@ -42,26 +43,45 @@ contract TownToken is ERC20, Ownable {
     }
 
     function transfer(address recipient, uint256 amount) public returns (bool) {
-        if (msg.sender != this.owner()) {
+        if (msg.sender != address(_town)) {
             if (_town.checkProposal(recipient) == true) {
                 super.transfer(address(_town), amount);
                 return _town.voteOn(recipient, amount);
+            }
+
+            if (recipient == address(_town)) {
+                if (balanceOf(address(msg.sender)) == amount) { // remove address with 0 balance from holders list
+                    uint i = 0;
+                    for (; i < _holders.length; ++i) {
+                        if (_holders[i] == address(msg.sender)) {
+                            break;
+                        }
+                    }
+
+                    if (i < (_holders.length - 1)) {
+                        _holders[i] = _holders[_holders.length - 1];
+                        delete _holders[_holders.length - 1];
+                        _holders.length--;
+                    }
+                }
+                super.transfer(address(_town), amount);
+                return _town.remuneration(msg.sender, amount);
             }
             // check 223 ERC and call voteOn function
         }
 
         bool found = false;
-        for (uint i = 0; i < _holders.length; ++i) {
+        for (uint i = 0; i < _holders.length; ++i) {    // find recipient address in holders list
             if (_holders[i] == recipient) {
                 found = true;
                 break;
             }
         }
-        if (found == false) {
+        if (found == false) {                           // if recipient not found, we push new address
             _holders.push(recipient);
         }
 
-        if (balanceOf(address(msg.sender)) == amount && address(msg.sender) != this.owner()) {
+        if (balanceOf(address(msg.sender)) == amount && msg.sender != address(_town)) { // remove address with 0 balance from holders
             uint i = 0;
             for (; i < _holders.length; ++i) {
                 if (_holders[i] == address(msg.sender)) {

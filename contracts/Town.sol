@@ -213,10 +213,7 @@ contract Town is TownInterface {
         return true;
     }
 
-    function remuneration(uint256 tokensAmount) external returns (bool) {
-        require(_token.balanceOf(msg.sender) >= tokensAmount, "Town tokens not found");
-        require(_token.allowance(msg.sender, address(this)) >= tokensAmount, "Town tokens must be approved for town smart contract");
-
+    function remuneration(address recipient, uint256 tokensAmount) external onlyTownTokenSmartContract returns (bool) {
         uint256 debt = 0;
         uint256 restOfTokens = tokensAmount;
         uint256 executedRequestCount = 0;
@@ -225,9 +222,9 @@ contract Town is TownInterface {
             uint256 rate = _queueTownTokenRequests[i]._info._rate;
             uint256 amount = _queueTownTokenRequests[i]._info._amount;
             if (restOfTokens > amount) {
-                _token.transferFrom(msg.sender, user, amount);
+                _token.transfer(user, amount);
                 restOfTokens = restOfTokens.sub(amount);
-                debt = debt.add(amount.mul(rate));
+                debt = debt.add(amount.mul(rate).div(10 ** 18));
                 executedRequestCount++;
             } else {
                 break;
@@ -245,21 +242,18 @@ contract Town is TownInterface {
             }
         }
 
-        _token.transferFrom(msg.sender, address(this), restOfTokens);
-
-        if (_historyTransactions[msg.sender].length > 0) {
-            for (uint256 i = _historyTransactions[msg.sender].length - 1; i >= 0; --i) {
-                uint256 rate = _historyTransactions[msg.sender][i]._rate;
-                uint256 amount = _historyTransactions[msg.sender][i]._amount;
-                delete _historyTransactions[msg.sender][i];
-                _historyTransactions[msg.sender].length--;
+        if (_historyTransactions[recipient].length > 0) {
+            for (uint256 i = _historyTransactions[recipient].length - 1; i >= 0; --i) {
+                uint256 rate = _historyTransactions[recipient][i]._rate;
+                uint256 amount = _historyTransactions[recipient][i]._amount;
+                delete _historyTransactions[recipient][i];
+                _historyTransactions[recipient].length--;
 
                 if (restOfTokens < amount) {
                     TransactionsInfo memory info = TransactionsInfo(rate, amount.sub(restOfTokens));
-                    _historyTransactions[msg.sender].push(info);
+                    _historyTransactions[recipient].push(info);
 
                     debt = debt.add(restOfTokens.mul(rate).div(10 ** 18));
-                    restOfTokens = 0;
                     break;
                 }
 
@@ -269,12 +263,12 @@ contract Town is TownInterface {
         }
 
         if (debt > address(this).balance) {
-            msg.sender.transfer(address(this).balance);
+            address(uint160(recipient)).transfer(address(this).balance);
 
-            RemunerationsInfo memory info = RemunerationsInfo(msg.sender, 2, debt.sub(address(this).balance));
+            RemunerationsInfo memory info = RemunerationsInfo(address(uint160(recipient)), 2, debt.sub(address(this).balance));
             _remunerationsQueue.push(info);
         } else {
-            msg.sender.transfer(debt);
+            address(uint160(recipient)).transfer(debt);
         }
 
         return true;

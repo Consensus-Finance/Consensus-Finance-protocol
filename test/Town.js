@@ -11,7 +11,7 @@ const Town = artifacts.require('Town');
 const TownToken = artifacts.require('TownToken');
 const ExternalToken = artifacts.require('ExternalTokenTemplate');
 
-contract('Town test', async ([owner, official, holder]) => {
+contract('Town test', async ([official, holder, otherHolder]) => {
     beforeEach(async () => {
         this.distributionPeriod = 24;
 
@@ -50,18 +50,12 @@ contract('Town test', async ([owner, official, holder]) => {
             'Official should have external tokens for approved');
     });
 
-    it('call transfer() from the Town token by owner', async () => {
-        await this.externalToken.approve(this.town.address, new BN(10), { from: official });
-        await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
-        await this.townToken.transfer(this.externalToken.address, new BN(0), { from: owner });
-        expect(await this.townToken.getHolderByIndex.call(0)).to.equal(this.externalToken.address);
-    });
-
-    it('FAIL: call transfer() from the Town token by not owner', async () => {
-        await this.externalToken.approve(this.town.address, new BN(10), { from: official });
-        await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
-        await expectRevert(this.townToken.transfer(this.externalToken.address, new BN(10), { from: holder }),
-            'SafeMath: subtraction overflow');
+    it('call transfer() from the Town token holder', async () => {
+        await this.town.send(ether('0.003'), { from: holder });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('150000000000000000000'));
+        await this.townToken.transfer(otherHolder, new BN('100000000000000000000'), { from: holder });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('50000000000000000000'));
+        expect(await this.townToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('100000000000000000000'));
     });
 
     it('call getTownTokens() and checking the Town token holders', async () => {
@@ -70,7 +64,7 @@ contract('Town test', async ([owner, official, holder]) => {
         expect(await this.townToken.getHoldersCount.call()).to.be.bignumber.equal(new BN(1));
         expect(await this.townToken.getHolderByIndex.call(0)).to.equal(holder);
 
-        await this.townToken.transfer(this.town.address, new BN('100000000000000000000'), { from: holder });
+        await this.townToken.transfer(otherHolder, new BN('100000000000000000000'), { from: holder });
         await this.town.getTownTokens(holder, { value: ether('0.0000001') });
         await this.town.getTownTokens(holder, { value: ether('0.003') });
         expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('125000000000000000000'));
@@ -101,19 +95,20 @@ contract('Town test', async ([owner, official, holder]) => {
     });
 
     it('call remuneration()', async () => {
-        await expectRevert(this.town.remuneration(new BN(10), { from: holder }), 'Town tokens not found');
-        await this.town.getTownTokens(holder, { value: ether('0.003') });
-        await this.townToken.approve(this.town.address, new BN('100000000000000000000'), { from: holder });
-        await expectRevert(this.town.remuneration(new BN('100000000000000000001'), { from: holder }),
-            'Town tokens must be approved for town smart contract');
-        const townBalanceBefore = await balance.current(this.town.address);
-        await this.town.remuneration(new BN('100000000000000000000'), { from: holder });
-        const townBalanceAfter = await balance.current(this.town.address);
-        expect(townBalanceBefore.sub(townBalanceAfter)).to.be.bignumber.equal(ether('0.002'));
+        await this.town.send(ether('0.003'), { from: holder });
+        const townBalanceBeforeRefund = await balance.current(this.town.address);
+        expect(townBalanceBeforeRefund).to.be.bignumber.equal(ether('0.003'));
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('150000000000000000000'));
+
+        await this.townToken.transfer(this.town.address, new BN('100000000000000000000'), { from: holder });
+
+        const townBalanceAfterRefund = await balance.current(this.town.address);
+        expect(townBalanceBeforeRefund.sub(townBalanceAfterRefund)).to.be.bignumber.equal(ether('0.002'));
 
         const result = await this.town.getMyTownTokens.call({ from: holder });
         expect(result['0']).to.be.bignumber.equal(new BN('1000000000000000'));
         expect(result['1']).to.be.bignumber.equal(new BN('50000000000000000000'));
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('50000000000000000000'));
     });
 
     it('call distributionSnapshot()', async () => {

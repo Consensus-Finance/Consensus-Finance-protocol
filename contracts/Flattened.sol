@@ -634,6 +634,7 @@ contract Town is TownInterface {
     uint256 private _durationOfMinTokenGetAmount;
     uint256 private _maxTokenGetAmount;
     uint256 private _minExternalTokensAmount;
+    uint256 private _minSignAmount;
     uint256 private _lastDistributionsDate;
 
     uint256 private _transactionsCount;
@@ -717,19 +718,23 @@ contract Town is TownInterface {
         _maxTokenGetAmount = maxTokenGetAmount;
         _minExternalTokensAmount = minExternalTokensAmount;
         _lastDistributionsDate = (now.div(86400).add(1)).mul(86400);
+        _minSignAmount = 10000000000000;
     }
 
     function () external payable {
-        if (msg.value < currentRate()) {
+        if (msg.value <= _minSignAmount) {
             if (_officialsLedger[msg.sender] > 0) {
                 claimFunds(msg.sender);
             }
             if (_ledgerExternalTokensAddresses[msg.sender].length > 0) {
                 claimExternalTokens(msg.sender);
             }
-        } else {
-            getTownTokens(msg.sender);
+            return;
         }
+        uint256 tokenAmount = IWantTakeTokensToAmount(msg.value);
+        require(_transactionsCount > _durationOfMinTokenGetAmount || tokenAmount > _minTokenGetAmount, "insufficient amount");
+
+        getTownTokens(msg.sender);
     }
 
     function token() external view returns (IERC20) {
@@ -778,6 +783,10 @@ contract Town is TownInterface {
 
     function getLengthRemunerationQueue() external view returns (uint256) {
         return _remunerationsQueue.length;
+    }
+
+    function getMinSignAmount() external view returns (uint256) {
+        return _minSignAmount;
     }
 
     function getRemunerationQueue(uint256 index) external view returns (address, uint256, uint256) {

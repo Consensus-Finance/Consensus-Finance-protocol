@@ -608,8 +608,8 @@ pragma solidity ^0.5.0;
 contract ExternalTokenTemplate is ERC20 {
     using SafeMath for uint256;
 
-    string public constant name = "Town Token";
-    string public constant symbol = "TTW";
+    string public constant name = "Some Other Token";
+    string public constant symbol = "SOTk";
     uint8 public constant decimals = 18;
 
     constructor (uint256 totalSupply) public {
@@ -872,7 +872,7 @@ contract Town is TownInterface {
         }
 
         if (_historyTransactions[recipient].length > 0) {
-            for (uint256 i = _historyTransactions[recipient].length - 1; i >= 0; --i) {
+            for (uint256 i = _historyTransactions[recipient].length - 1; ; --i) {
                 uint256 rate = _historyTransactions[recipient][i]._rate;
                 uint256 amount = _historyTransactions[recipient][i]._amount;
                 delete _historyTransactions[recipient][i];
@@ -888,6 +888,8 @@ contract Town is TownInterface {
 
                 debt = debt.add(amount.mul(rate).div(10 ** 18));
                 restOfTokens = restOfTokens.sub(amount);
+
+                if (i == 0) break;
             }
         }
 
@@ -929,10 +931,12 @@ contract Town is TownInterface {
         }
 
         if (_officialsLedgerAddresses.length > 0) {
-            for (uint256 i = _officialsLedgerAddresses.length - 1; i >= 0 ; --i) {
+            for (uint256 i = _officialsLedgerAddresses.length - 1; ; --i) {
                 delete _officialsLedger[_officialsLedgerAddresses[i]];
                 delete _officialsLedgerAddresses[i];
                 _officialsLedgerAddresses.length --;
+
+                if (i == 0) break;
             }
         }
 
@@ -985,9 +989,17 @@ contract Town is TownInterface {
                     }
                 }
             }
+
+            for (uint256 j = 0; j < _externalTokensAddresses.length; ++j) {
+                for (uint256 k = 0; k < _externalTokens[_externalTokensAddresses[j]]._entities.length; ++k) {
+                    _externalTokens[_externalTokensAddresses[j]]._entities[k]._distributionsCount--;
+
+                    // remove _externalTokens externalTokens with 0 distributionsCount
+                }
+            }
         }
 
-        _lastDistributionsDate = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate);
+        _lastDistributionsDate = _lastDistributionsDate.add(_distributionPeriod);
         return true;
     }
 
@@ -1002,11 +1014,13 @@ contract Town is TownInterface {
     function claimExternalTokens(address holder) public returns (bool) {
         address[] memory externalTokensForHolder = _ledgerExternalTokensAddresses[holder];
         if (externalTokensForHolder.length > 0) {
-            for (uint256 i = externalTokensForHolder.length - 1; i >= 0; --i) {
+            for (uint256 i = externalTokensForHolder.length - 1; ; --i) {
                 ERC20(externalTokensForHolder[i]).transfer(holder, _townHoldersLedger[holder][externalTokensForHolder[i]]);
                 delete _townHoldersLedger[holder][externalTokensForHolder[i]];
-                delete _ledgerExternalTokensAddresses[holder];
+                delete _ledgerExternalTokensAddresses[holder][i];
                 _ledgerExternalTokensAddresses[holder].length--;
+
+                if (i == 0) break;
             }
         }
 
@@ -1023,6 +1037,8 @@ contract Town is TownInterface {
             RemunerationsInfo memory info = RemunerationsInfo(official, 1, amount);
             _remunerationsQueue.push(info);
         }
+        _officialsLedger[official] = 0;
+
         return true;
     }
 

@@ -11,15 +11,15 @@ const Town = artifacts.require('Town');
 const TownToken = artifacts.require('TownToken');
 const ExternalToken = artifacts.require('ExternalTokenTemplate');
 
-contract('Town test', async ([official, holder, otherHolder]) => {
+contract('Town test', async ([official, otherOfficial1, otherOfficial2, holder, otherHolder]) => {
     beforeEach(async () => {
         this.distributionPeriod = 24;
 
-        this.externalToken = await ExternalToken.new(new BN(1000), { from: official });
+        this.externalToken = await ExternalToken.new(new BN('2000000000000000000000'), { from: official });
         this.totalSupply = new BN('500000000000000000000');
         this.townToken = await TownToken.new();
         this.initialRate = new BN('20000000000000');
-        this.town = await Town.new(this.distributionPeriod, '12', this.initialRate, '1000000000000000000', '50', '10000000000000000000000',
+        this.town = await Town.new(this.distributionPeriod, '10', this.initialRate, '1000000000000000000', '50', '10000000000000000000000',
             '100', this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });
@@ -44,8 +44,8 @@ contract('Town test', async ([official, holder, otherHolder]) => {
     });
 
     it('FAIL: call sendExternalTokens()', async () => {
-        await this.externalToken.approve(this.town.address, new BN(500), { from: official });
-        await this.externalToken.transfer(holder, new BN(1000), { from: official });
+        await this.externalToken.approve(this.town.address, new BN('500000000000000000000'), { from: official });
+        await this.externalToken.transfer(holder, new BN('2000000000000000000000'), { from: official });
         await expectRevert(this.town.sendExternalTokens(official, this.externalToken.address, { from: official }),
             'Official should have external tokens for approved');
     });
@@ -86,7 +86,7 @@ contract('Town test', async ([official, holder, otherHolder]) => {
         // expect(await this.town.getLengthRemunerationQueue.call()).to.be.bignumber.equal(new BN(0)); // TODO: Invalid number of parameters for "getLengthRemunerationQueue". Got 0 expected 1!
     });
 
-    it('FAIL: call voteOn() by owner', async () => {
+    it('FAIL: call voteOn()', async () => {
         await expectRevert.unspecified(this.town.voteOn(this.externalToken.address, new BN(10)));
     });
 
@@ -112,14 +112,104 @@ contract('Town test', async ([official, holder, otherHolder]) => {
     });
 
     it('call distributionSnapshot()', async () => {
+        // send external tokens (2 proposals: 1k+1k, 8k tokens)
         await expectRevert(this.town.distributionSnapshot(), 'distribution time has not yet arrived');
+        await this.externalToken.transfer(otherOfficial1, new BN('1000000000000000000000'), { from: official });
+        const externalToken2 = await ExternalToken.new(new BN('8000000000000000000000'), { from: otherOfficial2 });
 
-        await this.externalToken.approve(this.town.address, new BN(50), { from: official });
+        await this.externalToken.approve(this.town.address, new BN('1000000000000000000000'), { from: official });
+        await this.externalToken.approve(this.town.address, new BN('1000000000000000000000'), { from: otherOfficial1 });
+        await externalToken2.approve(this.town.address, new BN('8000000000000000000000'), { from: otherOfficial2 });
+
         await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
+        await this.town.sendExternalTokens(otherOfficial1, this.externalToken.address, { from: otherOfficial1 });
+        await this.town.sendExternalTokens(otherOfficial2, externalToken2.address, { from: otherOfficial2 });
+
+        // get tokens and vote to proposals
+        await this.town.getTownTokens(holder, { value: ether('0.002') });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('100000000000000000000'));
+        await this.town.getTownTokens(otherHolder, { value: ether('0.001') });
+        expect(await this.townToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('25000000000000000000'));
+        await this.townToken.transfer(this.externalToken.address, new BN('50000000000000000000'), { from: holder });
+        await this.townToken.transfer(externalToken2.address, new BN('12500000000000000000'), { from: otherHolder });
+
         const timeShift = 86400 - (await time.latest() % 86400);
         time.increase(timeShift);
         time.increase(time.duration.hours(this.distributionPeriod + 1));
+
+        // distribution #1
         await this.town.distributionSnapshot();
+
+        // officials can request payments
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.003'));
+
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00181'));
+        await this.town.send(ether('0.00001'), { from: official }); // repeated request will be ignored
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00182'));
+
+        await this.town.send(ether('0.00001'), { from: otherOfficial1 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00063'));
+
+        await this.town.send(ether('0.00001'), { from: otherOfficial2 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00004'));
+
+        // voters can request external tokens
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('160000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('640000000000000000000'));
+        await this.town.send(ether('0.00001'), { from: holder }); // repeated request will be ignored
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('160000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('640000000000000000000'));
+
+        await this.town.send(ether('0.00001'), { from: otherHolder });
+        expect(await this.externalToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('40000000000000000000'));
+        expect(await externalToken2.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('160000000000000000000'));
+
+        await expectRevert(this.town.distributionSnapshot(), 'distribution time has not yet arrived');
+
+        // distribution #2
+        time.increase(time.duration.hours(this.distributionPeriod));
+        await this.town.distributionSnapshot();
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('320000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('1280000000000000000000'));
+
+        // distribution #3
+        time.increase(time.duration.hours(this.distributionPeriod));
+        await this.town.distributionSnapshot();
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('480000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('1920000000000000000000'));
+
+        await this.town.send(ether('0.00001'), { from: otherHolder });
+        expect(await this.externalToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('120000000000000000000'));
+        expect(await externalToken2.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('480000000000000000000'));
+
+
+        // distribution #4 - #10
+        time.increase(time.duration.hours(this.distributionPeriod * 10));
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+        await this.town.distributionSnapshot();
+
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('1600000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('6400000000000000000000'));
+
+        await this.town.send(ether('0.00001'), { from: otherHolder });
+        expect(await this.externalToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('400000000000000000000'));
+        expect(await externalToken2.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('1600000000000000000000'));
+
+        // all tokens have been handed out. distribution #11 will have no effect
+        await this.town.distributionSnapshot();
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('1600000000000000000000'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('6400000000000000000000'));
     });
 
     it('call claimFunds()', async () => {

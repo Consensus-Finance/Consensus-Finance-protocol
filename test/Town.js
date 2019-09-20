@@ -210,6 +210,9 @@ contract('Town test', async ([official, otherOfficial1, otherOfficial2, holder, 
         await this.town.send(ether('0.00001'), { from: holder });
         expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('1600000000000000000000'));
         expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('6400000000000000000000'));
+
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00014'));
     });
 
     it('call claimFunds()', async () => {

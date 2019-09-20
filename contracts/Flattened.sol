@@ -666,6 +666,11 @@ contract Town is TownInterface {
         uint256 _amount;
     }
 
+    struct RemunerationsOfficialsInfo {
+        uint256 _amount;
+        uint256 _decayTimestamp;
+    }
+
     TownToken private _token;
 
     mapping (address => TransactionsInfo[]) private _historyTransactions;
@@ -680,7 +685,7 @@ contract Town is TownInterface {
     mapping (address => mapping (address => uint256)) private _townHoldersLedger;
     mapping (address => address[]) private _ledgerExternalTokensAddresses;
 
-    mapping (address => uint256) private _officialsLedger;
+    mapping (address => RemunerationsOfficialsInfo) private _officialsLedger;
     address[] private _officialsLedgerAddresses;
 
     address[] private _externalTokensWithWight;
@@ -723,7 +728,7 @@ contract Town is TownInterface {
 
     function () external payable {
         if (msg.value <= _minSignAmount) {
-            if (_officialsLedger[msg.sender] > 0) {
+            if (_officialsLedger[msg.sender]._amount > 0) {
                 claimFunds(msg.sender);
             }
             if (_ledgerExternalTokensAddresses[msg.sender].length > 0) {
@@ -950,11 +955,13 @@ contract Town is TownInterface {
             uint256 externalTokenCost = fullBalance.mul(externalToken._weight).div(sumWeight);
             for (uint256 j = 0; j < externalToken._entities.length; ++j) {
                 address official = externalToken._entities[j]._official;
-                if (_officialsLedger[official] == 0) {
+                if (_officialsLedger[official]._amount == 0 && _officialsLedger[official]._decayTimestamp == 0) {
                     _officialsLedgerAddresses.push(official);
+                    uint256 tokensAmount = externalToken._entities[j]._distributionAmount;
+                    uint256 amount = externalTokenCost.mul(tokensAmount).div(sumExternalTokens);
+                    uint256 decayTimestamp = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate).add(_distributionPeriod);
+                    _officialsLedger[official] = RemunerationsOfficialsInfo(amount, decayTimestamp);
                 }
-                uint256 amount = externalToken._entities[j]._distributionAmount;
-                _officialsLedger[official] = _officialsLedger[official].add(externalTokenCost.mul(amount).div(sumExternalTokens));
             }
         }
 
@@ -1028,16 +1035,23 @@ contract Town is TownInterface {
     }
 
     function claimFunds(address payable official) public returns (bool) {
-        require(_officialsLedger[official] != 0, "official address not found in ledger");
+        require(_officialsLedger[official]._amount != 0, "official address not found in ledger");
 
-        uint256 amount = _officialsLedger[official];
+        if (now >= _officialsLedger[official]._decayTimestamp) {
+            RemunerationsOfficialsInfo memory info = RemunerationsOfficialsInfo(0, 0);
+            _officialsLedger[official] = info;
+            return false;
+        }
+
+        uint256 amount = _officialsLedger[official]._amount;
         if (address(this).balance >= amount) {
             official.transfer(amount);
         } else {
             RemunerationsInfo memory info = RemunerationsInfo(official, 1, amount);
             _remunerationsQueue.push(info);
         }
-        _officialsLedger[official] = 0;
+        RemunerationsOfficialsInfo memory info = RemunerationsOfficialsInfo(0, 0);
+        _officialsLedger[official] = info;
 
         return true;
     }

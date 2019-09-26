@@ -100,7 +100,9 @@ contract('Town test', async ([official, otherOfficial1, otherOfficial2, holder, 
         expect(townBalanceBeforeRefund).to.be.bignumber.equal(ether('0.003'));
         expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('150000000000000000000'));
 
-        await this.townToken.transfer(this.town.address, new BN('100000000000000000000'), { from: holder });
+       // await this.townToken.transfer(this.town.address, new BN('100000000000000000000'), { from: holder });
+        await this.townToken.approve(this.town.address, new BN('100000000000000000000'), { from: holder });
+        await this.town.remuneration(new BN('100000000000000000000'), { from: holder });
 
         const townBalanceAfterRefund = await balance.current(this.town.address);
         expect(townBalanceBeforeRefund.sub(townBalanceAfterRefund)).to.be.bignumber.equal(ether('0.002'));

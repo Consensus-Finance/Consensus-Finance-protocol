@@ -13,13 +13,14 @@ const ExternalToken = artifacts.require('ExternalTokenTemplate');
 
 contract('Town test', async ([official, otherOfficial1, otherOfficial2, holder, otherHolder]) => {
     beforeEach(async () => {
-        this.distributionPeriod = 24;
+        this.distributionPeriod = 24; // 24 hours
+        this.distributionPeriodNumber = 10;
 
         this.externalToken = await ExternalToken.new(new BN('2000000000000000000000'), { from: official });
         this.totalSupply = new BN('500000000000000000000');
         this.townToken = await TownToken.new();
         this.initialRate = new BN('20000000000000');
-        this.town = await Town.new(this.distributionPeriod, '10', this.initialRate, '1000000000000000000', '50', '10000000000000000000000',
+        this.town = await Town.new(this.distributionPeriod, this.distributionPeriodNumber, this.initialRate, '1000000000000000000', '50', '10000000000000000000000',
             '100', this.townToken.address);
         await this.townToken.init(this.totalSupply, this.town.address);
     });
@@ -215,6 +216,102 @@ contract('Town test', async ([official, otherOfficial1, otherOfficial2, holder, 
 
         await this.town.send(ether('0.00001'), { from: official });
         expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00014'));
+    });
+
+    it('call distributionSnapshot many times()', async () => {
+        await expectRevert(this.town.distributionSnapshot(), 'distribution time has not yet arrived');
+        const externalToken2 = await ExternalToken.new(new BN('9000000000000000000000'), { from: otherOfficial2 });
+
+        await this.externalToken.approve(this.town.address, new BN('1000000000000000000000'), { from: official });
+        await externalToken2.approve(this.town.address, new BN('9000000000000000000000'), { from: otherOfficial2 });
+
+        await this.town.sendExternalTokens(official, this.externalToken.address, { from: official });
+        await this.town.sendExternalTokens(otherOfficial2, externalToken2.address, { from: otherOfficial2 });
+
+        // get tokens and vote to proposals
+        await this.town.getTownTokens(holder, { value: ether('0.002') });
+        expect(await this.townToken.balanceOf(holder)).to.be.bignumber.equal(new BN('100000000000000000000'));
+        await this.town.getTownTokens(otherHolder, { value: ether('0.001') });
+        expect(await this.townToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('25000000000000000000'));
+        await this.townToken.transfer(externalToken2.address, new BN('1000000000000000000'), { from: holder });
+
+        const timeShift = 86400 - (await time.latest() % 86400);
+        time.increase(timeShift);
+        time.increase(time.duration.hours(this.distributionPeriod + 1));
+
+        // distribution #1
+        await this.town.distributionSnapshot();
+
+        // officials can request payments
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.003'));
+
+        time.increase(86400);
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00301'));
+        await this.town.send(ether('0.00001'), { from: otherOfficial2 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00302'));
+
+        await this.town.distributionSnapshot();
+        await this.townToken.transfer(externalToken2.address, new BN('1000000000000000000'), { from: holder });
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00303'));
+        await this.town.send(ether('0.00001'), { from: otherOfficial2 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00002'));
+
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        await this.townToken.transfer(externalToken2.address, new BN('1000000000000000000'), { from: holder });
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00003'));
+        await this.town.send(ether('0.00001'), { from: otherOfficial2 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00002'));
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('796909193311922542803'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('7172182739807302885295'));
+        await this.town.send(ether('0.00001'), { from: otherHolder });
+        expect(await this.externalToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('203090806688077457187'));
+        expect(await externalToken2.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('1827817260192697114695'));
+        expect(await this.externalToken.balanceOf(this.town.address)).to.be.bignumber.equal(new BN('10'));
+        expect(await externalToken2.balanceOf(this.town.address)).to.be.bignumber.equal(new BN('10'));
+
+        time.increase(86400);
+        await this.townToken.transfer(this.externalToken.address, new BN('1000000000000000000'), { from: holder });
+        await this.town.distributionSnapshot();
+
+        await this.town.send(ether('0.00001'), { from: holder });
+        expect(await this.externalToken.balanceOf(holder)).to.be.bignumber.equal(new BN('796909193311922542803'));
+        expect(await externalToken2.balanceOf(holder)).to.be.bignumber.equal(new BN('7172182739807302885295'));
+        await this.town.send(ether('0.00001'), { from: otherHolder });
+        expect(await this.externalToken.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('203090806688077457187'));
+        expect(await externalToken2.balanceOf(otherHolder)).to.be.bignumber.equal(new BN('1827817260192697114695'));
+        expect(await this.externalToken.balanceOf(this.town.address)).to.be.bignumber.equal(new BN('10'));
+        expect(await externalToken2.balanceOf(this.town.address)).to.be.bignumber.equal(new BN('10'));
+
+        time.increase(86400);
+        await this.town.distributionSnapshot();
+        time.increase(86400);
+        await this.townToken.transfer(externalToken2.address, new BN('1000000000000000000'), { from: holder });
+        await this.town.distributionSnapshot();
+        await this.town.send(ether('0.00001'), { from: official });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00007'));
+        await this.town.send(ether('0.00001'), { from: otherOfficial2 });
+        expect(await balance.current(this.town.address)).to.be.bignumber.equal(ether('0.00008'));
+
     });
 
     it('call claimFunds()', async () => {

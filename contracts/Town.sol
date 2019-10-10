@@ -66,7 +66,6 @@ contract Town is TownInterface {
     mapping (address => address[]) private _ledgerExternalTokensAddresses;
 
     mapping (address => RemunerationsOfficialsInfo) private _officialsLedger;
-    address[] private _officialsLedgerAddresses;
 
     address[] private _externalTokensWithWight;
 
@@ -308,7 +307,7 @@ contract Town is TownInterface {
             if (externalToken._weight > 0) {
                 uint256 sumExternalTokens = 0;
                 for (uint256 j = 0; j < externalToken._entities.length; ++j) {
-                    if (externalToken._entities[j]._distributionsCount == _distributionPeriodsNumber) {
+                    if (externalToken._entities[j]._distributionsCount > 0) {
                         ExternalTokenDistributionsInfo memory info = externalToken._entities[j];
                         sumExternalTokens = sumExternalTokens.add(info._distributionAmount.mul(info._distributionsCount));
                     }
@@ -322,16 +321,6 @@ contract Town is TownInterface {
             }
         }
 
-        if (_officialsLedgerAddresses.length > 0) {
-            for (uint256 i = _officialsLedgerAddresses.length - 1; ; --i) {
-                delete _officialsLedger[_officialsLedgerAddresses[i]];
-                delete _officialsLedgerAddresses[i];
-                _officialsLedgerAddresses.length --;
-
-                if (i == 0) break;
-            }
-        }
-
         uint256 fullBalance = address(this).balance;
         for (uint256 i = 0; i < _externalTokensWithWight.length; ++i) {
             ExternalToken memory externalToken = _externalTokens[_externalTokensWithWight[i]];
@@ -342,13 +331,10 @@ contract Town is TownInterface {
             uint256 externalTokenCost = fullBalance.mul(externalToken._weight).div(sumWeight);
             for (uint256 j = 0; j < externalToken._entities.length; ++j) {
                 address official = externalToken._entities[j]._official;
-                if (_officialsLedger[official]._amount == 0 && _officialsLedger[official]._decayTimestamp == 0) {
-                    _officialsLedgerAddresses.push(official);
-                    uint256 tokensAmount = externalToken._entities[j]._distributionAmount;
-                    uint256 amount = externalTokenCost.mul(tokensAmount).div(sumExternalTokens);
-                    uint256 decayTimestamp = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate).add(_distributionPeriod);
-                    _officialsLedger[official] = RemunerationsOfficialsInfo(amount, decayTimestamp);
-                }
+                uint256 tokensAmount = externalToken._entities[j]._distributionAmount;
+                uint256 amount = externalTokenCost.mul(tokensAmount).div(sumExternalTokens);
+                uint256 decayTimestamp = (now - _lastDistributionsDate).div(_distributionPeriod).mul(_distributionPeriod).add(_lastDistributionsDate).add(_distributionPeriod);
+                _officialsLedger[official] = RemunerationsOfficialsInfo(amount, decayTimestamp);
             }
         }
 
@@ -385,11 +371,25 @@ contract Town is TownInterface {
             }
 
             for (uint256 j = 0; j < _externalTokensAddresses.length; ++j) {
-                for (uint256 k = 0; k < _externalTokens[_externalTokensAddresses[j]]._entities.length; ++k) {
-                    _externalTokens[_externalTokensAddresses[j]]._entities[k]._distributionsCount--;
+                ExternalTokenDistributionsInfo[] memory tempEntities = _externalTokens[_externalTokensAddresses[j]]._entities;
 
-                    // remove _externalTokens externalTokens with 0 distributionsCount
+                for (uint256 k = 0; k < tempEntities.length; ++k) {
+                    delete _externalTokens[_externalTokensAddresses[j]]._entities[k];
                 }
+                _externalTokens[_externalTokensAddresses[j]]._entities.length = 0;
+
+                for (uint256 k = 0; k < tempEntities.length; ++k) {
+                    tempEntities[k]._distributionsCount--;
+                    if (tempEntities[k]._distributionsCount > 0) {
+                        _externalTokens[_externalTokensAddresses[j]]._entities.push(tempEntities[k]);
+                    }
+                }
+            }
+        }
+
+        for (uint256 i = 0; i < _externalTokensAddresses.length; ++i) {
+            if (_externalTokens[_externalTokensAddresses[i]]._weight > 0) {
+                _externalTokens[_externalTokensAddresses[i]]._weight = 0;
             }
         }
 

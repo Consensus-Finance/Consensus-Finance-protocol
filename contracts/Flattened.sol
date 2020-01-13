@@ -1124,6 +1124,6 @@ contract Town is TownInterface {
     }
 
     function currentRate() internal view returns (uint256) {
-        return _startRate.mul(_transactionsCount.add(1));
+        return _startRate;
     }
 }

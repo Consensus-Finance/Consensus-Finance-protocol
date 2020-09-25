@@ -263,7 +263,7 @@ contract Town is TownInterface {
         require(maxTokenGetAmount > 0, "maxTokenGetAmount wrong");
         require(minExternalTokensAmount > 0, "minExternalTokensAmount wrong");
 
-        _distributionPeriod = distributionPeriod * 1 hours;
+        _distributionPeriod = distributionPeriod * 1 days;
         _distributionPeriodsNumber = distributionPeriodsNumber;
         _startRate = startRate;
 

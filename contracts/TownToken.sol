@@ -498,19 +498,22 @@ interface TownInterface {
 
 contract TownToken is ERC20, Ownable {
     using SafeMath for uint256;
-
-    string public constant name = "Town Token";
-    string public constant symbol = "TTW";
-    uint8 public constant decimals = 18;
+    
+    string public name;
+    string public symbol;
+    uint8 public decimals = 18;
 
     bool public initiated;
 
     address[] private _holders;
 
     TownInterface _town;
+    event Init(string name,string indexed symbol ,uint256 decimals, uint256 totalSupply, address indexed townContract);
 
-    constructor () {
+    constructor (string memory _name, string memory _symbol) {
         initiated = false;
+        name = _name;
+        symbol = _symbol;
     }
 
     function getHoldersCount() external view returns (uint256) {
@@ -521,11 +524,12 @@ contract TownToken is ERC20, Ownable {
         return _holders[index];
     }
 
-    function init (uint256 totalSupply, address townContract) public onlyOwner {
+    function init( uint256 totalSupply, address townContract) public onlyOwner {
         require(initiated == false, "contract already initiated");
         _town = TownInterface(townContract);
         _mint(townContract, totalSupply);
         initiated = true;
+        emit Init(name,symbol,decimals,totalSupply,townContract);
     }
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {

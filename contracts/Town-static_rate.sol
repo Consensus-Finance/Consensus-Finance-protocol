@@ -192,6 +192,7 @@ contract Town is TownInterface {
 
     uint256 private _transactionsCount;
 
+   
     struct ExternalTokenDistributionsInfo {
         address _official;
         uint256 _distributionAmount;
@@ -242,6 +243,10 @@ contract Town is TownInterface {
 
     address[] private _externalTokensWithWight;
 
+    event Proposal(uint256 value, address indexed _official, uint256 _distributionAmount, uint256 _distributionsCount, address indexed externalToken);
+    event Vote(address indexed externalToken, uint256 value);
+    event Init(uint256 _distributionPeriod,uint256 _distributionPeriodsNumber,uint256 _startRate,address indexed tokenAddress,uint256 _transactionsCount, uint256 _minTokenGetAmount,uint256 _durationOfMinTokenGetAmount,uint256 _maxTokenGetAmount,uint256 _minExternalTokensAmount,uint256 _lastDistributionsDate, uint256 _minSignAmount);
+
     modifier onlyTownTokenSmartContract {
         require(msg.sender == address(_token), "only town token smart contract can call this function");
         _;
@@ -276,6 +281,7 @@ contract Town is TownInterface {
         _minExternalTokensAmount = minExternalTokensAmount;
         _lastDistributionsDate = (block.timestamp.div(86400).add(1)).mul(86400);
         _minSignAmount = 10000000000000;
+        emit Init(_distributionPeriod,_distributionPeriodsNumber,_startRate,tokenAddress,_transactionsCount,_minTokenGetAmount,_durationOfMinTokenGetAmount,_maxTokenGetAmount,_minExternalTokensAmount,_lastDistributionsDate,_minSignAmount);
     }
 
     receive () external payable {
@@ -376,6 +382,10 @@ contract Town is TownInterface {
         return false;
     }
 
+    function getProposals(address externalToken) external view returns (uint256) {
+        return _externalTokens[externalToken]._entities.length;
+    }
+
     function sendExternalTokens(address official, address externalToken) external returns (bool) {
         Token tokenERC20 = Token(externalToken);
         uint256 balance = tokenERC20.allowance(official, address(this));
@@ -395,6 +405,7 @@ contract Town is TownInterface {
         }
 
         tokenObj._entities.push(tokenInfo);
+        emit Proposal(balance, tokenInfo._official, tokenInfo._distributionsCount, tokenInfo._distributionAmount, externalToken);
 
         return true;
     }
@@ -575,7 +586,12 @@ contract Town is TownInterface {
         require(block.timestamp < (_lastDistributionsDate + _distributionPeriod), "need call distributionSnapshot function");
 
         _externalTokens[externalToken]._weight = _externalTokens[externalToken]._weight.add(amount);
+        emit Vote(externalToken, amount);
         return true;
+    }
+
+    function getVotes() external view returns (uint256) {
+        return _externalTokensWithWight.length;
     }
 
     function claimExternalTokens(address holder) public returns (bool) {

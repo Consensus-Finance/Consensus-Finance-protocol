@@ -508,7 +508,7 @@ contract TownToken is ERC20, Ownable {
     address[] private _holders;
 
     TownInterface _town;
-    event Init(string name,string indexed symbol ,uint256 decimals, uint256 totalSupply, address indexed townContract);
+    event Init(string name, string indexed symbol, uint256 decimals, uint256 totalSupply, address indexed townContract);
 
     constructor (string memory _name, string memory _symbol) {
         initiated = false;
